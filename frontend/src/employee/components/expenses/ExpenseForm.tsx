@@ -1,0 +1,266 @@
+import React, { useState } from "react";
+import axios from "axios";
+
+interface ExpenseFormData {
+  title: string;
+  amount: number;
+  currency: string;
+  expenseDate: string;
+}
+
+interface Props {
+  onCreated: () => void;
+  onClose: () => void;
+}
+
+const CreateExpenseForm: React.FC<Props> = ({ onCreated,onClose }) => {
+  const [form, setForm] = useState<ExpenseFormData>({
+    title: "",
+    amount: 0,
+    currency: "INR",
+    expenseDate: "",
+  });
+
+  const [tags, setTags] = useState<string[]>([]);
+  const [currentTag, setCurrentTag] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    if (name === "amount") {
+      const num = Number(value);
+      if (num < 0) return;
+    }
+
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  //  ADD TAG
+  const handleAddTag = () => {
+    const trimmed = currentTag.trim().toLowerCase();
+    if (!trimmed) return;
+
+    if (!tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+    }
+
+    setCurrentTag("");
+  };
+
+  //  REMOVE TAG
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const validate = () => {
+    if (!form.title.trim()) return "Title is required";
+    if (!form.expenseDate) return "Expense date is required";
+    if (!selectedFile) return "Receipt file is required";
+    if (form.amount <= 0) return "Amount must be greater than 0";
+    return "";
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true)
+      const token = localStorage.getItem("token");
+
+      const formData = new FormData();
+      formData.append("title", form.title);
+      formData.append("amount", form.amount.toString());
+      formData.append("currency", form.currency);
+      formData.append("expenseDate", form.expenseDate);
+      formData.append("tags", JSON.stringify(tags)); // send tags array
+
+      if (selectedFile) {
+        formData.append("receipt", selectedFile);
+      }
+
+      await axios.post(
+        "http://localhost:8000/api/expenses/add-expense",
+        formData,
+        {
+          headers: {
+            token,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // Reset
+      setForm({
+        title: "",
+        amount: 0,
+        currency: "INR",
+        expenseDate: "",
+      });
+      setTags([]);
+      setCurrentTag("");
+      setSelectedFile(null);
+      setError("");
+      onCreated();
+
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to create expense");
+    }
+    finally{
+      setLoading(false);
+    }
+  };
+
+  return (
+<div className="bg-white rounded-xl shadow-md p-6 relative">
+        <h2 className="text-xl font-semibold mb-4">Create Expense</h2>
+      <button
+  type="button"
+  onClick={onClose}
+  className="absolute top-4 right-4 text-gray-500 hover:text-black"
+>
+  ✕
+</button>
+
+      {error && (
+        <div className="bg-red-100 text-red-600 p-2 rounded mb-4 text-sm">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        <input
+          type="text"
+          name="title"
+          placeholder="Title"
+          value={form.title}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+        />
+
+     <input
+  type="text"
+  name="amount"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  value={form.amount}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    // Allow only digits
+    if (/^\d*$/.test(value)) {
+      setForm({ ...form, amount: Number(value) });
+    }
+  }}
+  className="w-full border rounded px-3 py-2"
+/>
+
+        <select
+          name="currency"
+          value={form.currency}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+        >
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
+        </select>
+
+        <input
+          type="date"
+          name="expenseDate"
+          value={form.expenseDate}
+          onChange={handleChange}
+          className="w-full border rounded px-3 py-2"
+        />
+
+        {/*TAG INPUT SECTION */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Add Tags
+          </label>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={currentTag}
+              onChange={(e) => setCurrentTag(e.target.value)}
+              placeholder="Enter tag name"
+              className="flex-1 border rounded px-3 py-2"
+            />
+
+            <button
+              type="button"
+              onClick={handleAddTag}
+              className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition"
+            >
+              Add
+            </button>
+          </div>
+
+          {/* TAG CHIPS */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm"
+              >
+                #{tag}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveTag(tag)}
+                  className="text-red-500 font-bold"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* FILE INPUT */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Upload Receipt
+          </label>
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={handleFileChange}
+            className="w-full border rounded px-3 py-2 cursor-pointer"
+          />
+          {selectedFile && (
+            <p className="text-xs text-gray-500 mt-1">
+              Selected: {selectedFile.name}
+            </p>
+          )}
+        </div>
+<button
+  type="submit"
+  disabled={loading}
+  className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+>
+  {loading ? "Adding expense..." : "Add Expense"}
+</button>
+      </form>
+    </div>
+  );
+};
+
+export default CreateExpenseForm;
