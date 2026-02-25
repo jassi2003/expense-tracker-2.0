@@ -1,10 +1,12 @@
 import React from "react";
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Briefcase,
   Clock3,
   ShoppingBag,
   LogOut,
+  ChevronUp,
 } from "lucide-react";
 import { useAuth } from "@/contextApi/AuthContext";
 
@@ -27,13 +29,18 @@ const items: Item[] = [
 ];
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
-  const { logout } = useAuth();
+  const { logout,user } = useAuth();
+  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+
 
   const handleLogout = () => {
     logout();              // clear token + user
     navigate("/");    // redirect to login
   };
+
+
+
 
   const Nav = (
     <aside className="h-full w-72 border-r border-slate-200 bg-slate-50 px-4 py-4 flex flex-col">
@@ -78,16 +85,44 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* Logout Button */}
-      <div className="pt-4 border-t border-slate-200">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 transition"
-        >
-          <LogOut className="h-5 w-5" />
-          Logout
-        </button>
+      {/* User Profile Section */}
+<div className="pt-4 border-t border-slate-200 relative">
+  <button
+    onClick={() => setOpen(!open)}
+    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-100 transition"
+  >
+    <div className="flex items-center gap-3">
+      {/* Avatar */}
+      <div className="h-9 w-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold">
+        {user?.name?.charAt(0).toUpperCase()}
       </div>
+
+      {/* Name */}
+      <span className="text-sm font-medium text-slate-800 capitalize">
+       Welcome, {user?.name}!!
+      </span>
+    </div>
+
+    <ChevronUp
+      className={`h-4 w-4 transition-transform ${
+        open ? "rotate-180" : ""
+      }`}
+    />
+  </button>
+
+  {/* Dropdown */}
+  {open && (
+    <div className="absolute bottom-14 left-3 right-3 bg-white border border-slate-200 rounded-lg shadow-md">
+      <button
+        onClick={handleLogout}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+      >
+        <LogOut className="h-4 w-4" />
+        Logout
+      </button>
+    </div>
+  )}
+</div>
 
     </aside>
   );

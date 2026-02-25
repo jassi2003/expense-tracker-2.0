@@ -55,11 +55,10 @@ const AdminExpensesTable: React.FC<Props> = ({
               setSelectedStatus(status);
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-              selectedStatus === status
+            className={`px-4 py-2 rounded-md font-semibold transition cursor-pointer ${selectedStatus === status
                 ? "bg-black text-white"
                 : "bg-gray-200 text-black hover:bg-gray-300"
-            }`}
+              }`}
           >
             {status}
           </button>
@@ -73,6 +72,7 @@ const AdminExpensesTable: React.FC<Props> = ({
             <th className="py-3 px-4 text-left">Amount</th>
             <th className="py-3 px-4 text-left">Currency</th>
             <th className="py-3 px-4 text-left">Department</th>
+            <th className="py-3 px-4 text-left">Date</th>
             <th className="py-3 px-4 text-left">Status</th>
             <th className="py-3 px-4 text-center">Actions</th>
           </tr>
@@ -85,39 +85,41 @@ const AdminExpensesTable: React.FC<Props> = ({
               className="border-t border-gray-200 hover:bg-gray-50"
             >
               <td className="py-3 px-4">{exp.title}</td>
-              <td className="py-3 px-4">{exp.amount}</td>
+              <td className="py-3 px-4">₹{exp.amount}</td>
               <td className="py-3 px-4">{exp.currency}</td>
-              <td className="py-3 px-4">{exp.raisedBy?.dept}</td>
+              <td className="py-3 px-4 uppercase">{exp.raisedBy?.dept}</td>
+              <td className="py-3 px-4 uppercase"> {new Date(exp.expenseDate).toLocaleDateString()}</td>
 
               <td
-                className={`py-3 px-4 font-semibold ${
-                  exp.status === "APPROVED"
+                className={`py-3 px-4 font-semibold ${exp.status === "APPROVED"
                     ? "text-green-600"
                     : exp.status === "REJECTED"
-                    ? "text-red-600"
-                    : "text-gray-600"
-                }`}
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}
               >
                 {exp.status}
               </td>
 
               <td className="py-3 px-4 flex justify-center gap-2">
-                <button
-                  disabled={exp.status !== "PENDING"}
-                  onClick={() => onApprove(exp._id)}
-                  className="bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800 cursor-pointer disabled:opacity-40"
-                >
-                  Approve
-                </button>
+                {exp.status === "PENDING" && (
+                  <button
+                    onClick={() => onApprove(exp._id)}
+                    className="bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800 cursor-pointer disabled:opacity-40"
+                  >
+                    Approve
+                  </button>
 
-                <button
-                  disabled={exp.status !== "PENDING"}
-                  onClick={() => onReject(exp._id)}
-                  className="bg-gray-700 text-white px-3 py-1 rounded-md hover:bg-gray-900 cursor-pointer disabled:opacity-40"
-                >
-                  Reject
-                </button>
+                )}
 
+                {exp.status === "PENDING" && (
+                  <button
+                    onClick={() => onReject(exp._id)}
+                    className="bg-gray-700 text-white px-3 py-1 rounded-md hover:bg-gray-900 cursor-pointer disabled:opacity-40"
+                  >
+                    Reject
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedExpense(exp)}
                   className="bg-gray-300 text-black px-3 py-1 rounded-md hover:bg-gray-400 cursor-pointer"

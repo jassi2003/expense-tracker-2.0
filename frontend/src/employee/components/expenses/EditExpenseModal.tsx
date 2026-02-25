@@ -3,7 +3,8 @@ import React, { useState } from "react";
 interface Expense {
   _id: string;
   title: string;
-  amount: number;
+  // amount: number;
+  originalAmount: number;
   currency: string;
   expenseDate: string;
   tags: string[];
@@ -22,7 +23,7 @@ const EditExpenseModal: React.FC<Props> = ({
 }) => {
   const [form, setForm] = useState({
     title: expense.title,
-    amount: expense.amount,
+    originalAmount: expense.originalAmount,
     currency: expense.currency,
     expenseDate: expense.expenseDate.split("T")[0],
     tags: expense.tags.join(", "),
@@ -65,8 +66,40 @@ const EditExpenseModal: React.FC<Props> = ({
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
+ const validate = () => {
+     const MAX_AMOUNT = 5000000;
+
+    if (!form.title.trim()) return "Title is required";
+    if (!form.expenseDate) return "Expense date is required";
+    if (!selectedFile) return "Receipt file is required";
+   
+ if (!Number.isFinite(form.originalAmount))
+    return "Invalid amount";
+
+  if (form.originalAmount <= 0)
+    return "Amount must be greater than 0";
+
+  if (form.originalAmount > MAX_AMOUNT)
+    return "Amount exceeds allowed limit";
+
+  if (!form.currency) return "Currency required";
+
+  return "";
+  };
+
+
+
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+
+   const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+
 
     try {
       setLoading(true);
@@ -74,8 +107,8 @@ const EditExpenseModal: React.FC<Props> = ({
 
       const formData = new FormData();
       formData.append("title", form.title);
-      formData.append("amount", form.amount.toString());
-      formData.append("currency", form.currency);
+      formData.append("originalAmount", form.originalAmount.toString());
+      // formData.append("currency", form.currency);
       formData.append("expenseDate", form.expenseDate);
      formData.append("tags", JSON.stringify(tags)); // send tags array
 
@@ -116,15 +149,41 @@ const EditExpenseModal: React.FC<Props> = ({
             className="w-full border px-3 py-2 rounded"
           />
 
-          <input
-            type="number"
-            name="amount"
-            value={form.amount}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          />
+ <input
+  type="text"
+  name="amount"
+   value={Number(
+    (form.originalAmount as any)?.$numberDecimal ??
+      form.originalAmount ??
+      0
+  )}
+  onChange={(e) => {
+    const value = e.target.value.trim();
 
-          <select
+    // Allow only numbers with max 2 decimals
+    if (!/^\d*\.?\d{0,2}$/.test(value)) return;
+
+    const num = Number(value);
+
+    // Block NaN, Infinity, negative
+    if (!Number.isFinite(num) || num < 0) return;
+
+    // Block very large values
+    const MAX_AMOUNT = 5000000;
+    if (num > MAX_AMOUNT) {
+      setError("Amount exceeds allowed limit");
+      return;
+    }
+
+    setError("");
+    setForm({ ...form, originalAmount: num });
+  }}
+  inputMode="decimal"
+  placeholder="Enter amount"
+  className="w-full border rounded px-3 py-2"
+/>
+
+          {/* <select
             name="currency"
             value={form.currency}
             onChange={handleChange}
@@ -132,7 +191,7 @@ const EditExpenseModal: React.FC<Props> = ({
           >
             <option value="INR">INR</option>
             <option value="USD">USD</option>
-          </select>
+          </select> */}
 
           <input
             type="date"

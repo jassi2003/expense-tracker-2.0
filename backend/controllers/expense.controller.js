@@ -1,58 +1,133 @@
+import mongoose from "mongoose";
 import expenseModel from "../models/expense.model.js";
 import departmentModel from "../models/department.model.js";
-import mongoose from "mongoose";
+import exchangeRateModel from "../models/exchangeRate.model.js";
 import { v2 as cloudinary } from 'cloudinary'
 
-
-//ADDDING EXPENSE
+// ADDING EXPENSE
 export const addExpense = async (req, res) => {
   try {
-    const { title, amount, expenseDate, tags } = req.body;
-console.log("Received addExpense request with data:", req.body);  //console
-    if (!title || amount == null || !expenseDate) {
+    const { title, amount, expenseDate, tags, currency } = req.body;
+
+    if (!title || amount == null || !expenseDate || !currency) {
       return res.status(400).json({
         message: "All fields are required",
       });
     }
 
+    const MAX_AMOUNT = 5000000;
+    const parsedAmount = Number(amount);
+
+    // Validate amount
+    if (!Number.isFinite(parsedAmount) || isNaN(parsedAmount)) {
+      return res.status(400).json({
+        message: "Invalid amount value",
+      });
+    }
+
+    if (parsedAmount <= 0) {
+      return res.status(400).json({
+        message: "Amount must be greater than zero",
+      });
+    }
+
+    if (parsedAmount > MAX_AMOUNT) {
+      return res.status(400).json({
+        message: "Amount exceeds allowed limit",
+      });
+    }
+
+    // Validate department
+    const department = await departmentModel.findOne({
+      departmentName: { $regex: `^${req.user.dept}$`, $options: "i" },
+    });
+
+    if (!department) {
+      return res.status(404).json({
+        message: "Department not found",
+      });
+    }
+
+    if (!department.isActive) {
+      return res.status(400).json({
+        message:
+          "Department is inactive. Cannot raise new expense.",
+      });
+    }
+
+    // Validate exchange rate BEFORE upload
+    const exchangeDoc = await exchangeRateModel.findOne({
+      base: "INR",
+    });
+
+    if (!exchangeDoc) {
+      return res.status(500).json({
+        message: "Rates unavailable",
+      });
+    }
+
+    const rate = exchangeDoc.rates.get(currency);
+
+    if (!rate || !Number.isFinite(rate)) {
+      return res.status(400).json({
+        message: "Unsupported or invalid currency rate",
+      });
+    }
+
+    const MAX_INR_AMOUNT = 10000000;
+    const inrAmount = parsedAmount / rate;
+
+    if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+      return res.status(400).json({
+        message: "Invalid conversion result",
+      });
+    }
+    if (inrAmount > MAX_INR_AMOUNT) {
+  return res.status(400).json({
+    message: "Converted amount exceeds INR system limit",
+  });
+}
+
+    // Only now validate receipt
     if (!req.file) {
       return res.status(400).json({
         message: "Receipt file is required",
       });
     }
 
-    //  Upload file to Cloudinary
-   const uploadResult = await cloudinary.uploader.upload(
-  req.file.path,
-  {
-    folder: "expenses",
-  }
-);
+    // Uploadning after all validation
+    const uploadResult = await cloudinary.uploader.upload(
+      req.file.path,
+      { folder: "expenses" }
+    );
 
     const receiptUrl = uploadResult.secure_url;
 
-
-// Parse tags properly
-let parsedTags = [];
-
-if (tags) {
-  try {
-    parsedTags = JSON.parse(tags).map((tag) => {
-      const clean = tag.trim().toLowerCase();
-      return clean.startsWith("#") ? clean : `#${clean}`;
-    });
-  } catch (err) {
-    parsedTags = [];
-  }
-}
+    // Parse tags
+    let parsedTags = [];
+    if (tags) {
+      try {
+        parsedTags = JSON.parse(tags).map((tag) => {
+          const clean = tag.trim().toLowerCase();
+          return clean.startsWith("#")
+            ? clean
+            : `#${clean}`;
+        });
+      } catch {
+        parsedTags = [];
+      }
+    }
 
     // Create expense
     const created = await expenseModel.create({
       title: title.trim(),
-      amount: Number(amount),
+      amount: Number(inrAmount.toFixed(2)), // INR
+      currency,
+      originalAmount: parsedAmount,
       expenseDate: new Date(expenseDate),
       tags: parsedTags,
-      receipt: receiptUrl, //  store cloudinary URL
+      receipt: receiptUrl,
+      exchangeRate: Number(rate),
       raisedBy: {
         userId: req.user.userId,
         dept: req.user.dept,
@@ -63,11 +138,10 @@ if (tags) {
       message: "Expense created successfully",
       expense: created,
     });
-
   } catch (err) {
     console.error("addExpense error:", err);
     return res.status(500).json({
-      message: "Failed to create expense",
+      message: "Internal server error",
     });
   }
 };
@@ -92,7 +166,7 @@ export const getMyExpenses = async (req, res) => {
     const skip = (page - 1) * limit;
 
 
-      const filter = {
+    const filter = {
       "raisedBy.userId": userId,
     };
 
@@ -124,7 +198,7 @@ export const getMyExpenses = async (req, res) => {
     // Fetch paginated data
     const expenses = await expenseModel
       .find(filter)
-      .sort({ expenseDate: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
@@ -153,7 +227,6 @@ export const getMyExpenses = async (req, res) => {
 
 
 
-//UPDATING THE EXPENSE
 export const updateExpense = async (req, res) => {
   try {
     const { expenseId } = req.params;
@@ -174,7 +247,7 @@ export const updateExpense = async (req, res) => {
       });
     }
 
-    // Only allow update if expense is pending
+    // Only allow update if pending
     if (expense.status !== "PENDING") {
       return res.status(400).json({
         success: false,
@@ -182,7 +255,7 @@ export const updateExpense = async (req, res) => {
       });
     }
 
-    // Allow only owner or admin
+    // Authorization
     if (
       req.user.role !== "ADMIN" &&
       expense.raisedBy.userId !== req.user.userId
@@ -193,50 +266,117 @@ export const updateExpense = async (req, res) => {
       });
     }
 
-    const { title, currency, amount, expenseDate, tags } = req.body;
+    const { title, originalAmount, expenseDate, tags } = req.body;
 
-    // Update basic fields if provided
-    if (title) expense.title = title.trim();
-    if (currency) expense.currency = currency;
-    if (amount != null) {
-      if (Number(amount) <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Amount must be greater than 0",
-        });
-      }
-      expense.amount = Number(amount);
+    const MAX_ORIGINAL_AMOUNT = 5000000;
+    const MAX_INR_AMOUNT = 10000000;
+
+    // Update title
+    if (title) {
+      expense.title = title.trim();
     }
 
+    //  AMOUNT VALIDATION + CONVERSION
+    if (originalAmount != null) {
+      const parsedAmount = Number(originalAmount);
+
+      // Reject invalid numbers
+      if (!Number.isFinite(parsedAmount) || isNaN(parsedAmount)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid amount value",
+        });
+      }
+
+      if (parsedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Amount must be greater than zero",
+        });
+      }
+
+      if (parsedAmount > MAX_ORIGINAL_AMOUNT) {
+        return res.status(400).json({
+          success: false,
+          message: "Amount exceeds allowed limit",
+        });
+      }
+
+      // Fetch latest exchange rate
+      const exchangeDoc = await exchangeRateModel.findOne({
+        base: "INR",
+      });
+
+      if (!exchangeDoc) {
+        return res.status(500).json({
+          success: false,
+          message: "Exchange rates unavailable",
+        });
+      }
+
+      const rate = exchangeDoc.rates.get(expense.currency);
+
+      if (!rate || !Number.isFinite(rate)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid currency rate",
+        });
+      }
+
+      const inrAmount = parsedAmount / rate;
+
+      if (!Number.isFinite(inrAmount) || inrAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid conversion result",
+        });
+      }
+
+      if (inrAmount > MAX_INR_AMOUNT) {
+        return res.status(400).json({
+          success: false,
+          message: "Converted amount exceeds INR limit",
+        });
+      }
+
+      // Update fields
+      expense.originalAmount = parsedAmount;
+      expense.amount = Number(inrAmount.toFixed(2));
+      expense.exchangeRate = Number(rate);
+    }
+
+    // Update date
     if (expenseDate) {
       expense.expenseDate = new Date(expenseDate);
     }
 
-if (tags) {
-  try {
-    const parsedTags = JSON.parse(tags);
+    // Update tags
+    if (tags) {
+      try {
+        const parsedTags = JSON.parse(tags);
 
-    expense.tags = [
-      ...new Set(
-        parsedTags.map((tag) => {
-          const clean = tag.trim().toLowerCase();
-          return clean.startsWith("#") ? clean : `#${clean}`;
-        })
-      ),
-    ];
-  } catch (err) {
-    expense.tags = [];
-  }
-}
+        expense.tags = [
+          ...new Set(
+            parsedTags.map((tag) => {
+              const clean = tag.trim().toLowerCase();
+              return clean.startsWith("#")
+                ? clean
+                : `#${clean}`;
+            })
+          ),
+        ];
+      } catch {
+        expense.tags = [];
+      }
+    }
 
-    //  receipt file uploaded
+    // Update receipt if new file
     if (req.file) {
-         const uploadResult = await cloudinary.uploader.upload(
-  req.file.path,
-  {
-    folder: "expenses",
-  }
-);
+      const uploadResult =
+        await cloudinary.uploader.upload(req.file.path, {
+          folder: "expenses",
+        });
+
       expense.receipt = uploadResult.secure_url;
     }
 
@@ -247,12 +387,11 @@ if (tags) {
       message: "Expense updated successfully",
       expense,
     });
-
   } catch (error) {
     console.error("updateExpense error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to update expense",
+      message:error.message,
     });
   }
 };
@@ -415,11 +554,11 @@ export const approveExpense = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Expense approved & budget deducted",
-       title: expense.title,
+      title: expense.title,
       userId: expense.raisedBy.userId,
       department: expense.raisedBy.dept,
-      status:expense.status,
-      ExpenseAmount:expense.amount,
+      status: expense.status,
+      ExpenseAmount: expense.amount,
       department: {
         departmentName: updatedDept.departmentName,
         totalBudget: updatedDept.totalBudget,
@@ -466,8 +605,8 @@ export const rejectExpense = async (req, res) => {
       title: expense.title,
       userId: expense.raisedBy.userId,
       department: expense.raisedBy.dept,
-      status:expense.status,
-      amount:expense.amount,
+      status: expense.status,
+      amount: expense.amount,
     });
   } catch (err) {
     console.error("rejectExpense error:", err);
@@ -806,6 +945,7 @@ export const getAllExpensesAdmin = async (req, res) => {
   }
 };
 
+
 //GET EXEPSNSE BY ID
 export const getExpenseById = async (req, res) => {
   try {
@@ -883,7 +1023,7 @@ export const deleteExpense = async (req, res) => {
       //   return res.status(400).json({
       //     message: "Only pending expenses can be deleted",
       //   });
-     // }
+      // }
 
       await expenseModel.findByIdAndDelete(id);
 

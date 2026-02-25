@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import DepartmentSection from "../components/department/AddDepartment";
 import DepartmentCards from "../components/department/DepartmentCards";
+import UpdateDepartmentModal from "../components/department/UpdateDepttModal";
+
 
 export type Department = {
   _id: string;
@@ -15,8 +17,13 @@ export type Department = {
 const Departments = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
+const token=localStorage.getItem("token") || "";
+const [selectedDept, setSelectedDept] = useState<Department | null>(null);
+const [isUpdateOpen, setIsUpdateOpen] = useState(false);
 
-  // ✅ Fetch Departments
+
+
+  // Fetch Departments
   const fetchDepartments = async () => {
     try {
       setLoading(true);
@@ -25,7 +32,7 @@ const Departments = () => {
         "http://localhost:8000/api/departments/get-department",
         {
           headers: {
-            token: localStorage.getItem("token") || "",
+            token
           },
         }
       );
@@ -64,6 +71,57 @@ const Departments = () => {
     return res.data;
   };
 
+//HANDLE TOGGLE DEPARTMENT
+const handleToggleDepartment = async (dept: Department) => {
+  try {
+    const url = dept.isActive
+      ? `http://localhost:8000/api/departments/deactivate-department/${dept._id}`
+      : `http://localhost:8000/api/departments/activate-department/${dept._id}`;
+
+    await axios.put(
+      url,
+      {},
+      {
+        headers: {
+          token: localStorage.getItem("token") || "",
+        },
+      }
+    );
+
+    await fetchDepartments();
+  } catch (error) {
+    console.error("Toggle failed");
+  }
+};
+
+//update department
+const handleUpdateDepartment = async (
+  departmentId: string,
+  departmentName: string,
+  totalBudget: number
+) => {
+  try {
+    await axios.put(
+      `http://localhost:8000/api/departments/update-department/${departmentId}`,
+      {
+        departmentName,
+        totalBudget,
+      },
+      {
+        headers: {
+          token: localStorage.getItem("token") || "",
+        },
+      }
+    );
+
+    setIsUpdateOpen(false);
+    await fetchDepartments();
+  } catch (error) {
+    console.error("Update failed");
+  }
+};
+
+
   useEffect(() => {
     fetchDepartments();
   }, []);
@@ -78,8 +136,24 @@ const Departments = () => {
       {loading ? (
         <div>Loading...</div>
       ) : (
-        <DepartmentCards departments={departments} />
-      )}
+<DepartmentCards
+  departments={departments}
+  onToggle={handleToggleDepartment}
+  onOpenUpdate={(dept) => {
+    setSelectedDept(dept);
+    setIsUpdateOpen(true);
+  }}
+/>  
+
+
+)}
+{isUpdateOpen && selectedDept && (
+  <UpdateDepartmentModal
+    department={selectedDept}
+    onClose={() => setIsUpdateOpen(false)}
+    onUpdate={handleUpdateDepartment}
+  />
+)}
     </div>
   );
 };

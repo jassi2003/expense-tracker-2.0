@@ -12,7 +12,7 @@ type Props = {
   setPage: React.Dispatch<React.SetStateAction<number>>;
   selectedStatus: string;
   setSelectedStatus: (status: any) => void;
-    onDelete: (id: string) => void; 
+  onDelete: (id: string) => void;
 
 };
 
@@ -24,7 +24,7 @@ const ExpenseList: React.FC<Props> = ({
   page,
   totalPages,
   setPage,
-   onDelete,
+  onDelete,
   selectedStatus,
   setSelectedStatus,
 }) => {
@@ -42,11 +42,10 @@ const ExpenseList: React.FC<Props> = ({
               setSelectedStatus(status as any);
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
-              selectedStatus === status
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-black hover:bg-gray-300"
-            }`}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${selectedStatus === status
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-black hover:bg-gray-300"
+              }`}
           >
             {status}
           </button>
@@ -79,53 +78,63 @@ const ExpenseList: React.FC<Props> = ({
             {expenses.map((exp) => (
               <tr key={exp._id} className="border-t">
                 <td className="px-4 py-3">{exp.title}</td>
-                <td className="px-4 py-3">{exp.amount}</td>
+              <td>
+  {new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: exp.currency,
+  }).format(
+    Number(
+      (exp.originalAmount as any)?.$numberDecimal ??
+        exp.originalAmount
+    )
+  )}
+</td>
                 <td className="px-4 py-3">
                   {new Date(exp.expenseDate).toLocaleDateString()}
                 </td>
-  <td className="px-4 py-3 text-center">{exp.tags}</td>
+                <td className="px-4 py-3 text-center">{exp.tags}</td>
                 <td className="px-4 py-3 text-center">{exp.status}</td>
                 <td className="px-4 py-3 text-center"><p>
-  {exp.receipt ? (
-    <button
-      onClick={() => window.open(exp.receipt, "_blank")}
-      className="text-blue-600 font-medium hover:underline cursor-pointer"
-    >
-      View Receipt
-    </button>
-  ) : (
-    <span className="text-gray-400">No Receipt</span>
-  )}
-</p></td>
-<td className="px-4 py-3 text-center">
-  {exp.status === "PENDING" ? (
-    <div className="flex justify-center gap-2">
-      <button
-        onClick={() => onEdit(exp)}
-        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition"
-      >
-        Edit
-      </button>
+                  {exp.receipt ? (
+                    <button
+                      onClick={() => window.open(exp.receipt, "_blank")}
+                      className="text-blue-600 font-medium hover:underline cursor-pointer"
+                    >
+                      View Receipt
+                    </button>
+                  ) : (
+                    <span className="text-gray-400">No Receipt</span>
+                  )}
+                </p></td>
+                <td className="px-4 py-3 text-center">
+                  {exp.status === "PENDING" ? (
+                    <div className="flex justify-center gap-2">
+                      <button
+                        onClick={() => onEdit(exp)}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition"
+                      >
+                        Edit
+                      </button>
 
-      <button
-        onClick={() => onDelete(exp._id)}
-        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
-      >
-        Delete
-      </button>
-    </div>
-  ) : (
-    <span className="text-gray-400 text-xs">
+                      <button
+                        onClick={() => onDelete(exp._id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs">
 
-        <button
-        onClick={() => onDelete(exp._id)}
-        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
-      >
-        Delete
-      </button>
-    </span>
-  )}
-</td>
+                      <button
+                        onClick={() => onDelete(exp._id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
 

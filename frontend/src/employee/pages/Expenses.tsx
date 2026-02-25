@@ -11,6 +11,7 @@ export interface Expense {
   _id: string;
   title: string;
   amount: number;
+  originalAmount: number;
   currency: string;
   expenseDate: string;
   receipt: string;

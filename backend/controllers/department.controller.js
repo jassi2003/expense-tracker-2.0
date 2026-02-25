@@ -87,3 +87,152 @@ export const getAllDepartments = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+// UPDATE DEPARTMENT
+export const updateDepartment = async (req, res) => {
+  try {
+    const { departmentId } = req.params;
+    const { departmentName, totalBudget } = req.body;
+
+    const department = await departmentModel.findById(departmentId);
+
+    if (!department) {
+      return res.status(404).json({
+        success: false,
+        message: "Department not found",
+      });
+    }
+
+    // Preventing duplicate department name
+    if (departmentName) {
+      const existingDept = await departmentModel.findOne({
+        departmentName: departmentName.trim(),
+        _id: { $ne: departmentId },
+      });
+
+      if (existingDept) {
+        return res.status(400).json({
+          success: false,
+          message: "Department name already exists",
+        });
+      }
+
+      department.departmentName = departmentName.trim();
+    }
+
+    // totalBudget cannot be less than consumedBudget
+    if (totalBudget !== undefined) {
+      if (totalBudget < department.consumedBudget) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Total budget cannot be less than consumed budget",
+        });
+      }
+
+      department.totalBudget = totalBudget;
+    }
+
+    department.updatedAt = new Date();
+
+    await department.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Department updated successfully",
+      department,
+    });
+  } catch (error) {
+    console.error("Update Department Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+      //DEACTIVATE DEPARTMENT 
+      export const activateDepartment = async (req, res) => {
+        try {
+          const { departmentId } = req.params;
+          const department = await departmentModel.findById(departmentId);
+      
+          if (!department) {
+            return res.status(404).json({
+              success: false,
+              message: "Department not found",
+            });
+          }
+      
+          if (department.isActive) {
+            return res.status(400).json({
+              success: false,
+              message: "Department already activated",
+            });
+          }
+      
+          department.isActive = true;
+          department.updatedAt = new Date();
+      
+          await department.save();
+      
+          return res.status(200).json({
+            success: true,
+            message: "Department activated successfully",
+            department,
+          });
+        } catch (error) {
+          console.error("Activate Department Error:", error);
+          return res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+          });
+        }
+      };
+
+
+
+      //DEACTIVATE DEPARTMENT 
+      export const deactivateDepartment = async (req, res) => {
+        try {
+          const { departmentId } = req.params;
+      console.log("deactivateDepartment request params:", req.params);
+          const department = await departmentModel.findById(departmentId);
+      
+          if (!department) {
+            return res.status(404).json({
+              success: false,
+              message: "Department not found",
+            });
+          }
+      
+          if (!department.isActive) {
+            return res.status(400).json({
+              success: false,
+              message: "Department already deactivated",
+            });
+          }
+      
+          department.isActive = false;
+          department.updatedAt = new Date();
+      
+          await department.save();
+      
+          return res.status(200).json({
+            success: true,
+            message: "Department deactivated successfully",
+            department,
+          });
+        } catch (error) {
+          console.error("Deactivate Department Error:", error);
+          return res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+          });
+        }
+      };

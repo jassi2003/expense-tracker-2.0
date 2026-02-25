@@ -15,11 +15,14 @@ const raisedBySchema = new mongoose.Schema(
 const expenseSchema = new mongoose.Schema({
     title: { type: String, required: true },
     currency: { type: String, required: true, default: "INR" },
-   amount: { type: Number, required: true, min: 0 },
+   amount: { type: Number, required: true, min: 0 },  //inr amount
+    originalAmount: {type: mongoose.Schema.Types.Decimal128,required: true},  //orginial amount in orginal currency
     expenseDate: { type: Date, required: true },
     tags: [{ type: String, trim: true }],
     receipt: { type: String, required: true },
     status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
+    exchangeRate: {type: Number,required: true,
+    },
     raisedBy: { type: raisedBySchema, required: true },
 
 }, { timestamps: true })
