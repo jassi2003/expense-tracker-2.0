@@ -5,6 +5,8 @@ import expenseRoutes from "./routes/expense.routes.js";
 import departmentRouter from "./routes/department.routes.js";
 import currencyRouter from "./routes/currency.routes.js";
 import cors from 'cors'
+import errorMiddleware from "./middlewares/errorMiddleware.js";
+import morgan from "morgan";
 
 
 const app = express()
@@ -22,10 +24,14 @@ app.use(cors({
     credentials: true
 }));
 
+app.use(morgan("dev"));
+
 app.use("/api/user",userRouter)
 app.use("/api/expenses",expenseRoutes)
 app.use("/api/departments",departmentRouter)
 app.use("/api/currency",currencyRouter)
+
+app.use(errorMiddleware);
 
 
 export default app

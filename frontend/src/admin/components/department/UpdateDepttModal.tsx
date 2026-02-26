@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Department } from "../../pages/Departments";
 
-
 type Props = {
   department: Department;
   onClose: () => void;
@@ -20,34 +19,47 @@ const UpdateDepartmentModal: React.FC<Props> = ({
   const [departmentName, setDepartmentName] = useState("");
   const [totalBudget, setTotalBudget] = useState("");
   const [loading, setLoading] = useState(false);
-  
+  const [error, setError] = useState<string | null>(null);
 
   // Prefill existing values
   useEffect(() => {
     setDepartmentName(department.departmentName);
     setTotalBudget(String(department.totalBudget));
+    setError(null);
   }, [department]);
 
   const handleSubmit = async () => {
+    setError(null);
+
+    // Frontend validation
     if (!departmentName.trim()) {
-      alert("Department name required");
+      setError("Department name is required");
       return;
     }
 
     if (!totalBudget || Number(totalBudget) <= 0) {
-      alert("Enter valid budget");
+      setError("Please enter a valid budget greater than 0");
       return;
     }
 
     try {
       setLoading(true);
+
       await onUpdate(
         department._id,
         departmentName.trim(),
         Number(totalBudget)
       );
-    } catch (err) {
-      console.error("Update failed");
+
+      onClose(); // close on success
+    } catch (err: any) {
+      // Handle backend error message
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to update department";
+
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -60,16 +72,24 @@ const UpdateDepartmentModal: React.FC<Props> = ({
           Update Department
         </h2>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
             <label className="text-sm">Department Name</label>
             <input
               type="text"
               value={departmentName}
-              onChange={(e) =>
-                setDepartmentName(e.target.value)
-              }
-              className="w-full border rounded-lg px-3 py-2 mt-1"
+              onChange={(e) => {
+                setDepartmentName(e.target.value);
+                if (error) setError(null);
+              }}
+              className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-slate-400"
             />
           </div>
 
@@ -78,10 +98,11 @@ const UpdateDepartmentModal: React.FC<Props> = ({
             <input
               type="number"
               value={totalBudget}
-              onChange={(e) =>
-                setTotalBudget(e.target.value)
-              }
-              className="w-full border rounded-lg px-3 py-2 mt-1"
+              onChange={(e) => {
+                setTotalBudget(e.target.value);
+                if (error) setError(null);
+              }}
+              className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-slate-400"
             />
           </div>
         </div>

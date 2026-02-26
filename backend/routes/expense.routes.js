@@ -19,7 +19,7 @@ const expenseRoutes=express.Router()
 
 expenseRoutes.post("/add-expense",authUser,upload.single("receipt"),addExpense)
 expenseRoutes.put("/update-expense/:expenseId",authUser,upload.single("receipt"),updateExpense)
-expenseRoutes.get("/all-expenses", authUser, getMyExpenses); //get expenses for logged in user
+expenseRoutes.get("/all-expenses", authUser, getMyExpenses); //getting expenses for logged in user
 expenseRoutes.get("/expense-summary", authUser, getExpenseSummary);
 expenseRoutes.put("/approve-expense/:expId", authUser, approveExpense);
 expenseRoutes.put("/reject-expense/:expId",authUser,rejectExpense)

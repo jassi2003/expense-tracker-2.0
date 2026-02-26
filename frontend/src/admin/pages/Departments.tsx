@@ -42,6 +42,7 @@ const [isUpdateOpen, setIsUpdateOpen] = useState(false);
 
     } catch (err) {
       console.error("Fetch department failed");
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -91,6 +92,7 @@ const handleToggleDepartment = async (dept: Department) => {
     await fetchDepartments();
   } catch (error) {
     console.error("Toggle failed");
+    throw error;
   }
 };
 
@@ -116,9 +118,10 @@ const handleUpdateDepartment = async (
 
     setIsUpdateOpen(false);
     await fetchDepartments();
-  } catch (error) {
-    console.error("Update failed");
-  }
+  } catch (error: any) {
+  console.error("Update failed");
+  throw error;
+}
 };
 
 

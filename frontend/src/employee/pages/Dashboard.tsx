@@ -8,7 +8,7 @@ import TagAnalytics from "../components/dashboard/TagAnalytics";
 
 
 
-/* ---------------- TYPES ---------------- */
+/* TYPES  */
 type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface Expense {
@@ -86,38 +86,37 @@ export default function Dashboard() {
   }, [fetchDashboardData]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+  <div className="space-y-6">
 
-        <button
-          onClick={fetchDashboardData}
-          className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-        >
-          Refresh
-        </button>
-      </div>
+    {/* Header */}
+    <div className="flex items-center justify-between">
+      <h1 className="text-2xl font-semibold text-slate-900">
+        Dashboard
+      </h1>
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Top row */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Chart expenses={expenses} loading={loading} />
-        </div>
-        <Summary summary={summary} loading={loading} />
-        <div>
-          <TagAnalytics data={tagData} />
-        </div>
-
-
-      </div>
-
-
+      <button
+        onClick={fetchDashboardData}
+        className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+      >
+        Refresh
+      </button>
     </div>
-  );
+
+    {error && (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error}
+      </div>
+    )}
+    <div className="w-full">
+      <Chart expenses={expenses} loading={loading} />
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Summary summary={summary} loading={loading} />
+      <TagAnalytics data={tagData} />
+    </div>
+
+
+  </div>
+);
 }
