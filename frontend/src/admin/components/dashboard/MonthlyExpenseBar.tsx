@@ -67,7 +67,7 @@ const MonthlyExpenseBar: React.FC<Props> = ({ year, data }) => {
             <XAxis dataKey="month" />
             <YAxis tickFormatter={(v) => `${v}`} />
             <Tooltip
-              formatter={(value: any, name: any, props: any) => {
+              formatter={(value: any, name: any) => {
                 if (name === "totalAmount") return [formatINR(Number(value)), "Total"];
                 return [value, name];
               }}

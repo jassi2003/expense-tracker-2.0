@@ -4,6 +4,7 @@ import departmentModel from "../models/department.model.js";
 import exchangeRateModel from "../models/exchangeRate.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+import HistoricalAdminStatsModel from "../models/HistoricalAdminStats.model.js";
 import { v2 as cloudinary } from 'cloudinary'
 
 
@@ -111,6 +112,7 @@ export const addExpense = asyncHandler(async (req, res) => {
 
 
 
+
 //GETTING ALL EXPENSES by LOGGED IN USER
 export const getMyExpenses = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
@@ -179,7 +181,7 @@ export const getMyExpenses = asyncHandler(async (req, res) => {
 
 
 
-//UPDATING THE EXPENSE
+// UPDATING THE EXPENSE
 export const updateExpense = asyncHandler(async (req, res) => {
   const { expenseId } = req.params;
 
@@ -307,7 +309,8 @@ export const updateExpense = asyncHandler(async (req, res) => {
 
 
 
-//EXPENSE SUMMARY
+
+//EXPENSE SUMMARY FOR LOGGED IN EMPLOYEE
 export const getExpenseSummary = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
 
@@ -462,6 +465,7 @@ export const approveExpense = asyncHandler(async (req, res) => {
 });
 
 
+
 //REJECT EXEPENSE
 export const rejectExpense = asyncHandler(async (req, res) => {
   if (req.user?.role !== "ADMIN") {
@@ -578,29 +582,38 @@ export const generateAdminReport = asyncHandler(async (req, res) => {
 });
 
 
-//GENERATING ADMIN STATS
-export const getAdminDashboardStats = asyncHandler(async (req, res) => {
+
+
+
+// GENERATING TODAY'S ADMIN STATS (Live Data)
+export const getTodayAdminStats = asyncHandler(async (req, res) => {
   const now = new Date();
-  const month = Number(req.query.month) || now.getMonth() + 1;
-  const year = Number(req.query.year) || now.getFullYear();
 
-  if (month < 1 || month > 12) {
-    throw new ApiError(400, "month must be between 1 and 12");
-  }
+  // Start of today (00:00:00)
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
 
-  const startOfMonth = new Date(year, month - 1, 1);
-  const startOfNextMonth = new Date(year, month, 1);
+  // Start of tomorrow
+  const startOfTomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1
+  );
 
   const stats = await expenseModel.aggregate([
     {
+      // Single match for today's expenses
+      $match: {
+        expenseDate: { $gte: startOfToday, $lt: startOfTomorrow },
+      },
+    },
+    {
       $facet: {
-        approvedThisMonth: [
-          {
-            $match: {
-              status: "APPROVED",
-              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
-            },
-          },
+        approvedToday: [
+          { $match: { status: "APPROVED" } },
           {
             $group: {
               _id: null,
@@ -609,13 +622,8 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
             },
           },
         ],
-        pendingThisMonth: [
-          {
-            $match: {
-              status: "PENDING",
-              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
-            },
-          },
+        pendingToday: [
+          { $match: { status: "PENDING" } },
           {
             $group: {
               _id: null,
@@ -625,12 +633,7 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
           },
         ],
         topDepartment: [
-          {
-            $match: {
-              status: "APPROVED",
-              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
-            },
-          },
+          { $match: { status: "APPROVED" } },
           {
             $group: {
               _id: "$raisedBy.dept",
@@ -642,12 +645,7 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
           { $limit: 1 },
         ],
         topEmployee: [
-          {
-            $match: {
-              status: "APPROVED",
-              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
-            },
-          },
+          { $match: { status: "APPROVED" } },
           {
             $group: {
               _id: "$raisedBy.userId",
@@ -664,12 +662,12 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
 
   const result = stats?.[0] || {};
 
-  const approvedThisMonth = result.approvedThisMonth?.[0] || {
+  const approvedToday = result.approvedToday?.[0] || {
     totalApprovedAmount: 0,
     approvedCount: 0,
   };
 
-  const pendingThisMonth = result.pendingThisMonth?.[0] || {
+  const pendingToday = result.pendingToday?.[0] || {
     pendingCount: 0,
     pendingAmount: 0,
   };
@@ -679,16 +677,14 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    month,
-    year,
-    period: { from: startOfMonth, to: startOfNextMonth },
-    approvedThisMonth: {
-      totalApprovedAmount: approvedThisMonth.totalApprovedAmount || 0,
-      approvedCount: approvedThisMonth.approvedCount || 0,
+    period: { from: startOfToday, to: startOfTomorrow },
+    approved: {
+      totalApprovedAmount: approvedToday.totalApprovedAmount || 0,
+      approvedCount: approvedToday.approvedCount || 0,
     },
     pending: {
-      pendingCount: pendingThisMonth.pendingCount || 0,
-      pendingAmount: pendingThisMonth.pendingAmount || 0,
+      pendingCount: pendingToday.pendingCount || 0,
+      pendingAmount: pendingToday.pendingAmount || 0,
     },
     topDepartment: topDepartment
       ? {
@@ -710,6 +706,90 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
 
 
 
+
+//GETTING HISTORICAL ADMIN STATS From Pre-aggregated Monthly Stats Collection
+export const getHistoricalAdminStats = asyncHandler(async (req, res) => {
+  const month = Number(req.query.month);
+  const year = Number(req.query.year);
+
+  if (!month || !year) {
+    throw new ApiError(400, "Month and Year are required");
+  }
+
+  if (month < 1 || month > 12) {
+    throw new ApiError(400, "Month must be between 1 and 12");
+  }
+
+  const stats = await HistoricalAdminStatsModel
+    .findOne({ month, year })
+  
+
+  if (!stats) {
+    return res.json({
+      success: true,
+      period: {
+        from: new Date(year, month - 1, 1),
+        to: new Date(year, month, 1),
+      },
+      approved: { totalApprovedAmount: 0, approvedCount: 0 },
+      pending: { pendingAmount: 0, pendingCount: 0 },
+      rejected: { totalAmount: 0, count: 0 },
+      topDepartment: null,
+      topEmployee: null,
+      generatedAt: new Date(),
+    });
+  }
+
+  return res.json({
+    success: true,
+    period: {
+      from: new Date(year, month - 1, 1),
+      to: new Date(year, month, 1),
+    },
+
+    approved: {
+      totalApprovedAmount: stats.approved.totalAmount,
+      approvedCount: stats.approved.count,
+    },
+
+    pending: {
+      pendingAmount: stats.pending.totalAmount,
+      pendingCount: stats.pending.count,
+    },
+
+    rejected: {
+      totalAmount: stats.rejected.totalAmount,
+      count: stats.rejected.count,
+    },
+
+    topDepartment: stats.topDepartment
+      ? {
+          department: stats.topDepartment.department,
+          total: stats.topDepartment.totalAmount,
+        }
+      : null,
+
+    topEmployee: stats.topEmployee
+      ? {
+          userId: stats.topEmployee.userId,
+          total: stats.topEmployee.totalAmount,
+        }
+      : null,
+      
+  byEmployee: stats.empTotals
+    ? Object.fromEntries(stats.empTotals)
+    : {},
+
+  byDepartment: stats.deptTotals
+    ? Object.fromEntries(stats.deptTotals)
+    : {},
+
+    generatedAt: stats.updatedAt,
+  });
+});
+
+
+
 //MONTH WISE EXPENSES TOTALS
 export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   const now = new Date();
@@ -718,8 +798,7 @@ export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   const start = new Date(year, 0, 1);
   const end = new Date(year + 1, 0, 1);
 
-  const statusFilter = req.query.status || "APPROVED";
-
+  const statusFilter = "APPROVED";
   const result = await expenseModel.aggregate([
     {
       $match: {
@@ -805,8 +884,6 @@ export const getAllExpensesAdmin = asyncHandler(async (req, res) => {
 });
 
 
-
-
 //GET EXEPSNSE BY ID
 export const getExpenseById = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -868,7 +945,10 @@ export const deleteExpense = asyncHandler(async (req, res) => {
   throw new ApiError(403, "Unauthorized action");
 });
 
-//Tags STATS
+
+
+
+//Tags STATS FOR USER DASHBOARD
 export const getTagAnalytics = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
 
@@ -918,175 +998,3 @@ export const getTagAnalytics = asyncHandler(async (req, res) => {
 
 
 
-
-// db.expenses.aggregate([
-//   // :one: Match on the selected month
-//   {
-//     $match: {
-//       expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth }
-//     }
-//   },
-//   // :two: Project only the fields we need
-//   {
-//     $project: {
-//       amount: 1,
-//       status: 1,
-//       dept: "$raisedBy.dept",
-//       userId: "$raisedBy.userId"
-//     }
-//   },
-//   // :three: Group everything into one document
-//   {
-//     $group: {
-//       _id: null,
-//       // Total Approved
-//       totalApprovedAmount: {
-//         $sum: {
-//           $cond: [{ $eq: ["$status", "APPROVED"] }, "$amount", 0]
-//         }
-//       },
-//       approvedCount: {
-//         $sum: {
-//           $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0]
-//         }
-//       },
-//       // Total Pending
-//       pendingAmount: {
-//         $sum: {
-//           $cond: [{ $eq: ["$status", "PENDING"] }, "$amount", 0]
-//         }
-//       },
-//       pendingCount: {
-//         $sum: {
-//           $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0]
-//         }
-//       },
-//       // Prepare for top department
-//       deptTotals: {
-//         $push: {
-//           dept: "$dept",
-//           amount: "$amount",
-//           isApproved: { $eq: ["$status", "APPROVED"] }
-//         }
-//       },
-//       // Prepare for top employee
-//       employeeTotals: {
-//         $push: {
-//           userId: "$userId",
-//           amount: "$amount",
-//           isApproved: { $eq: ["$status", "APPROVED"] }
-//         }
-//       }
-//     }
-//   },
-//   // :four: Compute top department and top employee
-//   {
-//     $addFields: {
-//       topDepartment: {
-//         $first: {
-//           $sortArray: {
-//             input: {
-//               $filter: {
-//                 input: "$deptTotals",
-//                 cond: { $eq: ["$$this.isApproved", true] }
-//               }
-//             },
-//             sortBy: { amount: -1 }
-//           }
-//         }
-//       },
-//       topEmployee: {
-//         $first: {
-//           $sortArray: {
-//             input: {
-//               $filter: {
-//                 input: "$employeeTotals",
-//                 cond: { $eq: ["$$this.isApproved", true] }
-//               }
-//             },
-//             sortBy: { amount: -1 }
-//           }
-//         }
-//       }
-//     }
-//   },
-//   // :five: Clean up intermediate arrays
-//   {
-//     $project: {
-//       deptTotals: 0,
-//       employeeTotals: 0
-//     }
-//   }
-// ]);
-
-
-// db.expenses.aggregate([
-//   // :one: Match on the selected month
-//   {
-//     $match: {
-//       expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth }
-//     }
-//   },
-//   // :two: Group by status
-//   {
-//     $group: {
-//       _id: "$status",
-//       totalAmount: { $sum: "$amount" },
-//       count: { $sum: 1 },
-//       deptTotals: { $push: { dept: "$raisedBy.dept", amount: "$amount" } },
-//       employeeTotals: { $push: { userId: "$raisedBy.userId", amount: "$amount" } }
-//     }
-//   },
-//   // :three: Reshape the document to have separate fields for approved/pending
-//   {
-//     $project: {
-//       status: "$_id",
-//       _id: 0,
-//       totalAmount: 1,
-//       count: 1,
-//       deptTotals: 1,
-//       employeeTotals: 1
-//     }
-//   },
-//   // :four: Group everything back into a single document
-//   {
-//     $group: {
-//       _id: null,
-//       approved: {
-//         $first: {
-//           $cond: [{ $eq: ["$status", "APPROVED"] }, { totalAmount: "$totalAmount", count: "$count" }, { totalAmount: 0, count: 0 }]
-//         }
-//       },
-//       pending: {
-//         $first: {
-//           $cond: [{ $eq: ["$status", "PENDING"] }, { totalAmount: "$totalAmount", count: "$count" }, { totalAmount: 0, count: 0 }]
-//         }
-//       },
-//       allDeptTotals: { $push: "$deptTotals" },
-//       allEmployeeTotals: { $push: "$employeeTotals" }
-//     }
-//   },
-//   // :five: Flatten arrays and compute top department and employee
-//   {
-//     $addFields: {
-//       allDeptTotals: { $reduce: { input: "$allDeptTotals", initialValue: [], in: { $concatArrays: ["$$value", "$$this"] } } },
-//       allEmployeeTotals: { $reduce: { input: "$allEmployeeTotals", initialValue: [], in: { $concatArrays: ["$$value", "$$this"] } } }
-//     }
-//   },
-//   {
-//     $addFields: {
-//       topDepartment: {
-//         $first: { $sortArray: { input: "$allDeptTotals", sortBy: { amount: -1 } } }
-//       },
-//       topEmployee: {
-//         $first: { $sortArray: { input: "$allEmployeeTotals", sortBy: { amount: -1 } } }
-//       }
-//     }
-//   },
-//   {
-//     $project: {
-//       allDeptTotals: 0,
-//       allEmployeeTotals: 0
-//     }
-//   }
-// ]);

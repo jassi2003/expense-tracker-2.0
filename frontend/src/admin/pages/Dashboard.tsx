@@ -5,11 +5,40 @@ import MonthlyExpenseBar from "../components/dashboard/MonthlyExpenseBar";
 
 export type DashboardStats = {
   success: boolean;
-  period: { from: string; to: string };
-  approvedThisMonth: { totalApprovedAmount: number; approvedCount: number };
-  pending: { pendingCount: number; pendingAmount: number };
-  topDepartment: null | { department: string; total: number; count: number };
-  topEmployee: null | { userId: string; total: number; count: number };
+
+  period: {
+    from: string;
+    to: string;
+  };
+
+  approved: {
+    totalApprovedAmount: number;
+    approvedCount: number;
+  };
+
+  pending: {
+    pendingAmount: number;
+    pendingCount: number;
+  };
+
+  rejected: {
+    totalAmount: number;
+    count: number;
+  };
+
+  topDepartment: null | {
+    department: string;
+    total: number;
+  };
+
+  topEmployee: null | {
+    userId: string;
+    total: number;
+  };
+
+  byEmployee: Record<string, number>;
+  byDepartment: Record<string, number>;
+
   generatedAt: string;
 };
 
@@ -23,7 +52,8 @@ const Dashboard = () => {
   const token = localStorage.getItem("token") || "";
 
   const now = new Date();
-  const [month, setMonth] = useState<number>(now.getMonth() + 1);
+  const TODAY = 0;
+  const [month, setMonth] = useState<number>(TODAY);
   const [year, setYear] = useState<number>(now.getFullYear());
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -38,7 +68,9 @@ const Dashboard = () => {
     return [y - 2, y - 1, y, y + 1, y + 2];
   }, [now]);
 
-  const fetchStats = async (m = month, y = year) => {
+
+  //admin dashboard stats data
+  const fetchStats = async () => {
     setLoading(true);
     setErrorMsg("");
 
@@ -46,7 +78,7 @@ const Dashboard = () => {
       const res = await axios.get(
         "http://localhost:8000/api/expenses/admin-dashboard-stats",
         {
-          params: { month: m, year: y },
+          // params: { month: m, year: y },
           headers: { token },
         }
       );
@@ -61,6 +93,33 @@ const Dashboard = () => {
     }
   };
 
+  //agggregated data 
+  const fetchAggregatedStats = async (m = month, y = year) => {
+  setLoading(true);
+  setErrorMsg("");
+
+  try {
+    const res = await axios.get(
+      "http://localhost:8000/api/expenses/historical-admin-stats",
+      {
+        params: { month: m, year: y },
+        headers: { token },
+      }
+    );
+
+    setStats(res.data);
+  } catch (err: any) {
+    setStats(null);
+    setErrorMsg(
+      err?.response?.data?.message || "Failed to fetch dashboard stats"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  //monthly expenses data 
   const fetchMonthlyGraph = async (y = year) => {
     setMonthlyLoading(true);
 
@@ -81,11 +140,17 @@ setMonthlyData(res.data.data || []);
     }
   };
 
-  useEffect(() => {
-    fetchStats(month, year);
-    fetchMonthlyGraph(year);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year]);
+  
+
+useEffect(() => {
+   if (month === TODAY) {
+    fetchStats(); // live data
+  } else {
+    fetchAggregatedStats(month, year); // historical snapshot
+  }
+
+  fetchMonthlyGraph(year);
+}, [month, year]);
 
   return (
     <div className="p-6 space-y-6">
@@ -111,6 +176,7 @@ setMonthlyData(res.data.data || []);
                 onChange={(e) => setMonth(Number(e.target.value))}
                 className="rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/20"
               >
+                  <option value={TODAY}>Today</option>
                 <option value={1}>January</option>
                 <option value={2}>February</option>
                 <option value={3}>March</option>
@@ -145,9 +211,14 @@ setMonthlyData(res.data.data || []);
 
             <button
               onClick={() => {
-                fetchStats(month, year);
-                fetchMonthlyGraph(year);
-              }}
+  if (month === TODAY) {
+    fetchStats();
+  } else {
+    fetchAggregatedStats(month, year);
+  }
+
+  fetchMonthlyGraph(year);
+}}
               className="mt-6 sm:mt-0 px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
             >
               Refresh
@@ -171,8 +242,7 @@ setMonthlyData(res.data.data || []);
 
       {!loading && !errorMsg && (
         <>
-          <StatsCards stats={stats} />
-
+<StatsCards stats={stats} isToday={month === TODAY} />
           <div className="mt-6">
             {monthlyLoading ? (
               <div className="rounded-2xl border bg-white p-6 text-slate-600">

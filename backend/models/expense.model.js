@@ -32,6 +32,7 @@ expenseSchema.index({ "raisedBy.userId": 1 });
 expenseSchema.index({ "raisedBy.dept": 1 });
 expenseSchema.index({ expenseDate: 1 });
 expenseSchema.index({ status: 1 });
+expenseSchema.index({ createdAt: 1 });
 
 
 export default mongoose.model("ExpenseModel", expenseSchema);

@@ -2,6 +2,8 @@ import type { DashboardStats } from "../../pages/Dashboard";
 
 type Props = {
   stats: DashboardStats | null;
+    isToday: boolean;
+
 };
 
 const formatINR = (value: number) => {
@@ -22,8 +24,8 @@ const prettyDate = (iso: string) => {
   return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
 };
 
-const StatsCards: React.FC<Props> = ({ stats }) => {
-  if (!stats || stats.success === false) {
+const StatsCards: React.FC<Props> = ({ stats, isToday }) => {
+    if (!stats || stats.success === false) {
     return (
       <div className="rounded-2xl border bg-white p-6 text-slate-600">
         Not found.
@@ -31,20 +33,22 @@ const StatsCards: React.FC<Props> = ({ stats }) => {
     );
   }
 
-  const approvedAmt = stats.approvedThisMonth?.totalApprovedAmount || 0;
-  const approvedCount = stats.approvedThisMonth?.approvedCount || 0;
+const approvedAmt = stats.approved?.totalApprovedAmount || 0;
+const approvedCount = stats.approved?.approvedCount || 0;
 
   const pendingCount = stats.pending?.pendingCount || 0;
   const pendingAmt = stats.pending?.pendingAmount || 0;
 
   // "No data" rule: everything empty/zero AND top objects null
-  const noData =
-    approvedAmt === 0 &&
-    approvedCount === 0 &&
-    pendingCount === 0 &&
-    pendingAmt === 0 &&
-    !stats.topDepartment &&
-    !stats.topEmployee;
+const noData =
+  approvedAmt === 0 &&
+  approvedCount === 0 &&
+  pendingCount === 0 &&
+  pendingAmt === 0 &&
+  (stats.rejected?.count || 0) === 0 &&
+  (stats.rejected?.totalAmount || 0) === 0 &&
+  !stats.topDepartment &&
+  !stats.topEmployee;
 
   if (noData) {
     return (
@@ -63,9 +67,11 @@ const StatsCards: React.FC<Props> = ({ stats }) => {
       <div className="rounded-2xl border bg-white p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="text-sm text-slate-600">
           Period:{" "}
-          <span className="font-semibold text-slate-900">
-            {prettyDate(stats.period.from)} – {prettyDate(stats.period.to)}
-          </span>
+         <span className="font-semibold text-slate-900">
+  {isToday
+    ? "Today"
+    : `${prettyDate(stats.period.from)} – ${prettyDate(stats.period.to)}`}
+</span>
         </div>
         <div className="text-xs text-slate-500">
           Generated: {prettyDate(stats.generatedAt)}
@@ -76,7 +82,7 @@ const StatsCards: React.FC<Props> = ({ stats }) => {
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {/* 1) Approved Amount */}
         <div className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition">
-          <p className="text-xs font-medium text-slate-500">Approved (This Month)</p>
+          <p className="text-xs font-medium text-slate-500">Approved</p>
           <p className="mt-2 text-2xl font-bold text-slate-900">
             {formatINR(approvedAmt)}
           </p>
@@ -116,7 +122,7 @@ const StatsCards: React.FC<Props> = ({ stats }) => {
               <p className="mt-1 text-sm text-slate-600">
                 Count:{" "}
                 <span className="font-semibold text-slate-900">
-                  {stats.topDepartment.count}
+                  {stats.topDepartment.total}
                 </span>
               </p>
             </>
@@ -145,7 +151,7 @@ const StatsCards: React.FC<Props> = ({ stats }) => {
               <p className="mt-1 text-sm text-slate-600">
                 Count:{" "}
                 <span className="font-semibold text-slate-900">
-                  {stats.topEmployee.count}
+                  {stats.topEmployee.total}
                 </span>
               </p>
             </>
