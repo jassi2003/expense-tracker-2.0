@@ -13,7 +13,6 @@ const userSchema=new mongoose.Schema({
 
 
 userSchema.index({ userId: 1 }, { unique: true });
-userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ isActive: 1 });
 
 export default mongoose.model("UserModel", userSchema);

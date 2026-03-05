@@ -11,7 +11,7 @@ export type DashboardStats = {
     to: string;
   };
 
-  approved: {
+  approvedThisMonth: {
     totalApprovedAmount: number;
     approvedCount: number;
   };
@@ -21,23 +21,19 @@ export type DashboardStats = {
     pendingCount: number;
   };
 
-  rejected: {
-    totalAmount: number;
-    count: number;
-  };
 
   topDepartment: null | {
     department: string;
     total: number;
+    count: number
   };
 
   topEmployee: null | {
     userId: string;
     total: number;
+    count: number
   };
 
-  byEmployee: Record<string, number>;
-  byDepartment: Record<string, number>;
 
   generatedAt: string;
 };
@@ -52,8 +48,7 @@ const Dashboard = () => {
   const token = localStorage.getItem("token") || "";
 
   const now = new Date();
-  const TODAY = 0;
-  const [month, setMonth] = useState<number>(TODAY);
+const [month, setMonth] = useState<number>(now.getMonth() + 1);  
   const [year, setYear] = useState<number>(now.getFullYear());
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -70,7 +65,7 @@ const Dashboard = () => {
 
 
   //admin dashboard stats data
-  const fetchStats = async () => {
+  const fetchStats = async (m = month, y = year) => {
     setLoading(true);
     setErrorMsg("");
 
@@ -78,7 +73,7 @@ const Dashboard = () => {
       const res = await axios.get(
         "http://localhost:8000/api/expenses/admin-dashboard-stats",
         {
-          // params: { month: m, year: y },
+          params: { month: m, year: y },
           headers: { token },
         }
       );
@@ -93,30 +88,6 @@ const Dashboard = () => {
     }
   };
 
-  //agggregated data 
-  const fetchAggregatedStats = async (m = month, y = year) => {
-  setLoading(true);
-  setErrorMsg("");
-
-  try {
-    const res = await axios.get(
-      "http://localhost:8000/api/expenses/historical-admin-stats",
-      {
-        params: { month: m, year: y },
-        headers: { token },
-      }
-    );
-
-    setStats(res.data);
-  } catch (err: any) {
-    setStats(null);
-    setErrorMsg(
-      err?.response?.data?.message || "Failed to fetch dashboard stats"
-    );
-  } finally {
-    setLoading(false);
-  }
-};
 
 
   //monthly expenses data 
@@ -132,7 +103,7 @@ const Dashboard = () => {
         }
       );
 
-setMonthlyData(res.data.data || []);
+      setMonthlyData(res.data.data || []);
     } catch (err) {
       setMonthlyData([]);
     } finally {
@@ -140,17 +111,12 @@ setMonthlyData(res.data.data || []);
     }
   };
 
-  
 
-useEffect(() => {
-   if (month === TODAY) {
-    fetchStats(); // live data
-  } else {
-    fetchAggregatedStats(month, year); // historical snapshot
-  }
 
-  fetchMonthlyGraph(year);
-}, [month, year]);
+  useEffect(() => {
+    fetchStats();
+    fetchMonthlyGraph(year);
+  }, [month, year]);
 
   return (
     <div className="p-6 space-y-6">
@@ -176,7 +142,6 @@ useEffect(() => {
                 onChange={(e) => setMonth(Number(e.target.value))}
                 className="rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/20"
               >
-                  <option value={TODAY}>Today</option>
                 <option value={1}>January</option>
                 <option value={2}>February</option>
                 <option value={3}>March</option>
@@ -211,14 +176,9 @@ useEffect(() => {
 
             <button
               onClick={() => {
-  if (month === TODAY) {
-    fetchStats();
-  } else {
-    fetchAggregatedStats(month, year);
-  }
-
-  fetchMonthlyGraph(year);
-}}
+                fetchStats();
+                fetchMonthlyGraph(year);
+              }}
               className="mt-6 sm:mt-0 px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
             >
               Refresh
@@ -242,7 +202,7 @@ useEffect(() => {
 
       {!loading && !errorMsg && (
         <>
-<StatsCards stats={stats} isToday={month === TODAY} />
+          <StatsCards stats={stats} />
           <div className="mt-6">
             {monthlyLoading ? (
               <div className="rounded-2xl border bg-white p-6 text-slate-600">

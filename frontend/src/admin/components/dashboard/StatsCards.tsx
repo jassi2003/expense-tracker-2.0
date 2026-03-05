@@ -2,8 +2,6 @@ import type { DashboardStats } from "../../pages/Dashboard";
 
 type Props = {
   stats: DashboardStats | null;
-    isToday: boolean;
-
 };
 
 const formatINR = (value: number) => {
@@ -24,7 +22,7 @@ const prettyDate = (iso: string) => {
   return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
 };
 
-const StatsCards: React.FC<Props> = ({ stats, isToday }) => {
+const StatsCards: React.FC<Props> = ({ stats}) => {
     if (!stats || stats.success === false) {
     return (
       <div className="rounded-2xl border bg-white p-6 text-slate-600">
@@ -33,8 +31,8 @@ const StatsCards: React.FC<Props> = ({ stats, isToday }) => {
     );
   }
 
-const approvedAmt = stats.approved?.totalApprovedAmount || 0;
-const approvedCount = stats.approved?.approvedCount || 0;
+const approvedAmt = stats.approvedThisMonth?.totalApprovedAmount || 0;
+const approvedCount = stats.approvedThisMonth?.approvedCount || 0;
 
   const pendingCount = stats.pending?.pendingCount || 0;
   const pendingAmt = stats.pending?.pendingAmount || 0;
@@ -45,8 +43,6 @@ const noData =
   approvedCount === 0 &&
   pendingCount === 0 &&
   pendingAmt === 0 &&
-  (stats.rejected?.count || 0) === 0 &&
-  (stats.rejected?.totalAmount || 0) === 0 &&
   !stats.topDepartment &&
   !stats.topEmployee;
 
@@ -67,11 +63,6 @@ const noData =
       <div className="rounded-2xl border bg-white p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="text-sm text-slate-600">
           Period:{" "}
-         <span className="font-semibold text-slate-900">
-  {isToday
-    ? "Today"
-    : `${prettyDate(stats.period.from)} – ${prettyDate(stats.period.to)}`}
-</span>
         </div>
         <div className="text-xs text-slate-500">
           Generated: {prettyDate(stats.generatedAt)}

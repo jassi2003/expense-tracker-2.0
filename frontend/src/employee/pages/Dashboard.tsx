@@ -31,7 +31,6 @@ export type SummaryData = {
   pending: number;
   monthlyAverage: number;
 };
-/* -------------------------------------- */
 
 export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);

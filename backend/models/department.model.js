@@ -8,10 +8,7 @@ const departmentSchmema = new mongoose.Schema({
 
 },{ timestamps: true })
 
-departmentSchmema.index(
-  { departmentName: 1 },
-  { unique: true }
-);
+
 
 
 export default mongoose.model("DepartmentModel", departmentSchmema)

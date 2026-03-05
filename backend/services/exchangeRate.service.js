@@ -22,16 +22,16 @@ export const updateExchangeRates = async () => {
       },
       { upsert: true }
     );
-
     console.log("Exchange rates updated");
+
   } catch (err) {
     console.error("Exchange update failed:", err.message);
   }
 };
 
-export const startExchangeCron = () => {
-  // Every 1 hour
-  cron.schedule("0 * * * *", updateExchangeRates);
-    console.log("Exchange rate cron started");
-};
+// export const startExchangeCron = () => {
+//   // Every 1 hour
+//   cron.schedule("0 * * * *", updateExchangeRates);
+//     console.log("Exchange rate cron started");
+// };
 

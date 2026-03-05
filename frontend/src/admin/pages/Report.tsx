@@ -1,80 +1,188 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import { getQuarterDates } from "../utils/GetQuarterDates";
 import GenerateReport from "../components/report/GenerateReport";
 
-type ReportType = {
-  success: boolean;
-  fromDate: string;
-  toDate: string;
-  totalExpenseAmt: number;
-  ExpenseCount: number;
-  byDepartment: { _id: string; total: number; count: number }[];
-  byEmployee: { _id: string; total: number; count: number }[];
-  generatedAt: string;
-};
-
 export default function ReportPage() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [quarter, setQuarter] = useState(1);
-  const [report, setReport] = useState<ReportType | null>(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const [deptPage, setDeptPage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
+
+  const [overall, setOverall] = useState<any>([]);
+  const [departments, setDepartments] = useState<any>([]);
+  const [users, setUsers] = useState<any>([]);
+
+  const [dates, setDates] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState(false);
 
-  const handleGenerate = async () => {
-    const { startDate, endDate } = getQuarterDates(year, quarter);
+  const [deptList, setDeptList] = useState<any[]>([]);
+  const [selectedDept, setSelectedDept] = useState("");
 
-    try {
-      setLoading(true);
+  const token = localStorage.getItem("token");
 
-      const res = await axios.get(
-        "http://localhost:8000/api/expenses/admin-report",
-        {
-          headers: { token: localStorage.getItem("token") },
-          params: {
-            startDate,
-            endDate,
-          },
-        }
-      );
-
-      setReport(res.data);
-    } catch (err) {
-      console.error("Report error:", err);
-    } finally {
-      setLoading(false);
+  // 2. Updated Generate Report Logic
+  const generateReport = async () => {
+    if (!fromDate || !toDate) {
+      alert("Please select both dates");
+      return;
     }
+
+    setDates({ startDate: fromDate, endDate: toDate });
+    setDeptPage(1);
+    setUserPage(1);
+    setGenerated(true);
+  };
+
+  // FETCH DEPARTMENTS
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:8000/api/departments/get-department",
+          { headers: { token } }
+        );
+        setDeptList(res.data.departments || []);
+      } catch (err) {
+        console.error("Department fetch failed", err);
+      }
+    };
+    fetchDepartments();
+  }, [token]);
+
+  // OVERALL SUMMARY
+  useEffect(() => {
+    if (!dates || !generated) return;
+    const fetchOverall = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(
+          "http://localhost:8000/api/expenses/report-overall",
+          {
+            headers: { token },
+            params: { fromDate: dates.startDate, toDate: dates.endDate }
+          }
+        );
+        // Note: Using the fix from the previous response to access nested data
+        setOverall(res.data.data?.result || []);
+      } catch (err) {
+        console.error("Overall API failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOverall();
+  }, [dates, generated, token]);
+
+  // DEPARTMENT ANALYTICS 
+  useEffect(() => {
+    if (!dates || !generated) return;
+    const fetchDepartmentsAnalytics = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:8000/api/expenses/report-department",
+          {
+            headers: { token },
+            params: {
+              fromDate: dates.startDate,
+              toDate: dates.endDate,
+              page: deptPage,
+              limit: 5
+            }
+          }
+        );
+        setDepartments(res.data.data);
+      } catch (err) {
+        console.error("Department API failed", err);
+      }
+    };
+    fetchDepartmentsAnalytics();
+  }, [deptPage, dates, generated, token]);
+
+  // USER ANALYTICS 
+  useEffect(() => {
+    if (!dates || !generated) return;
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:8000/api/expenses/report-user",
+          {
+            headers: { token },
+            params: {
+              fromDate: dates.startDate,
+              toDate: dates.endDate,
+              page: userPage,
+              limit: 5,
+              dept: selectedDept || undefined
+            }
+          }
+        );
+        setUsers(res.data.data);
+      } catch (err) {
+        console.error("User API failed", err);
+      }
+    };
+    fetchUsers();
+  }, [userPage, dates, generated, selectedDept, token]);
+
+  const report = {
+    fromDate: dates?.startDate,
+    toDate: dates?.endDate,
+    generatedAt: new Date(),
+    overallSummary: overall,
+    byDepartment: departments,
+    byEmployee: users
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex gap-4 items-center">
-        <select
-          value={quarter}
-          onChange={(e) => setQuarter(Number(e.target.value))}
-          className="border p-2 rounded"
-        >
-          <option value={1}>Q1 (Jan-Mar)</option>
-          <option value={2}>Q2 (Apr-Jun)</option>
-          <option value={3}>Q3 (Jul-Sep)</option>
-          <option value={4}>Q4 (Oct-Dec)</option>
-        </select>
+    <div className="p-8 bg-gray-50 min-h-screen space-y-6">
+      
+      {/* FILTER BAR */}
+      <div className="bg-white p-6 rounded-xl shadow flex gap-6 items-center flex-wrap">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500 uppercase">From Date</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            onKeyDown={(e) => e.preventDefault()}
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
 
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="border p-2 rounded w-24"
-        />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500 uppercase">To Date</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            onKeyDown={(e) => e.preventDefault()}
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
 
         <button
-          onClick={handleGenerate}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          onClick={generateReport}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-medium self-end transition-colors"
         >
           {loading ? "Generating..." : "Generate Report"}
         </button>
       </div>
 
-      {report && <GenerateReport report={report} />}
+      {/* REPORT SECTION */}
+      {generated && (
+        <GenerateReport
+          report={report}
+          deptPage={deptPage}
+          setDeptPage={setDeptPage}
+          userPage={userPage}
+          setUserPage={setUserPage}
+          deptList={deptList}
+          selectedDept={selectedDept}
+          setSelectedDept={setSelectedDept}
+        />
+      )}
     </div>
   );
 }

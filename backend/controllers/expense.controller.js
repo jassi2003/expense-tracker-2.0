@@ -4,10 +4,10 @@ import departmentModel from "../models/department.model.js";
 import exchangeRateModel from "../models/exchangeRate.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
-import HistoricalAdminStatsModel from "../models/HistoricalAdminStats.model.js";
 import { v2 as cloudinary } from 'cloudinary'
-
-
+import { getOverallAnalyticsService } from "../services/analytics.service.js";
+import { getDepartmentAnalyticsService } from "../services/analytics.service.js";
+import { getUserAnalyticsService } from "../services/analytics.service.js";
 
 //ADDING EXPENSE
 export const addExpense = asyncHandler(async (req, res) => {
@@ -89,6 +89,9 @@ export const addExpense = asyncHandler(async (req, res) => {
     }
   }
 
+
+
+
   const created = await expenseModel.create({
     title: title.trim(),
     amount: Number(inrAmount.toFixed(2)),
@@ -102,6 +105,12 @@ export const addExpense = asyncHandler(async (req, res) => {
       userId: req.user.userId,
       dept: req.user.dept,
     },
+      departmentSnapshot: {
+    departmentName: department.departmentName,
+    totalBudget: department.totalBudget,
+    consumedBudget: department.consumedBudget,
+    isActive: department.isActive
+  }
   });
 
   return res.status(201).json({
@@ -507,113 +516,86 @@ export const rejectExpense = asyncHandler(async (req, res) => {
 
 
 
+// REPORT GENERATION
+// //overall monthly stats
+export const getOverallAnalytics = asyncHandler(async (req, res) => {
+  const { fromDate, toDate } = req.query;
 
+  const data= await getOverallAnalyticsService({fromDate,toDate})
 
-
-//GENERATING ADMIN REPORT 
-export const generateAdminReport = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
-
-  if (!startDate || !endDate) {
-    throw new ApiError(400, "startDate and endDate are required");
-  }
-
-  const matchStage = {
-    status: "APPROVED",
-    expenseDate: {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    },
-  };
-
-  const report = await expenseModel.aggregate([
-    { $match: matchStage },
-    {
-      $facet: {
-        overall: [
-          {
-            $group: {
-              _id: null,
-              totalExpenseAmt: { $sum: "$amount" },
-              ExpenseCount: { $sum: 1 },
-            },
-          },
-        ],
-        byDepartment: [
-          {
-            $group: {
-              _id: "$raisedBy.dept",
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          { $sort: { total: -1 } },
-        ],
-        byEmployee: [
-          {
-            $group: {
-              _id: "$raisedBy.userId",
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          { $sort: { total: -1 } },
-        ],
-      },
-    },
-  ]);
-
-  const result = report[0] || {
-    overall: [],
-    byDepartment: [],
-    byEmployee: [],
-  };
-
-  return res.json({
+  res.json({
     success: true,
-    fromDate: startDate,
-    toDate: endDate,
-    totalExpenseAmt: result.overall[0]?.totalExpenseAmt || 0,
-    ExpenseCount: result.overall[0]?.ExpenseCount || 0,
-    byDepartment: result.byDepartment,
-    byEmployee: result.byEmployee,
-    generatedAt: new Date(),
+    totalMonths: data.length,
+    data
   });
 });
 
 
 
+//getdepartmernt analytics
+export const getDepartmentAnalytics = asyncHandler(async (req, res) => {
+  const { fromDate, toDate, page = 1, limit = 10 } = req.query;
+
+    const result = await getDepartmentAnalyticsService({
+      fromDate,
+      toDate,
+      page: Number(page),
+      limit: Number(limit),
+       paginate: true 
+    });
+   res.json({
+    success: true,
+    ...result
+  });
+});
 
 
-// GENERATING TODAY'S ADMIN STATS (Live Data)
-export const getTodayAdminStats = asyncHandler(async (req, res) => {
+//get user analytics
+export const getUserAnalytics = asyncHandler(async (req, res) => {
+  
+   const { fromDate, toDate, dept, page = 1, limit = 10 } = req.query;
+
+const result=await getUserAnalyticsService({fromDate,
+  toDate,
+  dept,
+  page:Number(page),
+  limit:Number(limit),
+paginate:true
+})
+
+
+return res.json({
+  success:true,
+  ...result
+})
+
+});
+
+
+
+//GENERATING ADMIN STATS
+export const getAdminDashboardStats = asyncHandler(async (req, res) => {
   const now = new Date();
+  const month = Number(req.query.month) || now.getMonth() + 1;
+  const year = Number(req.query.year) || now.getFullYear();
 
-  // Start of today (00:00:00)
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  );
+  if (month < 1 || month > 12) {
+    throw new ApiError(400, "month must be between 1 and 12");
+  }
 
-  // Start of tomorrow
-  const startOfTomorrow = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1
-  );
+  const startOfMonth = new Date(year, month - 1, 1);
+  const startOfNextMonth = new Date(year, month, 1);
 
   const stats = await expenseModel.aggregate([
     {
-      // Single match for today's expenses
-      $match: {
-        expenseDate: { $gte: startOfToday, $lt: startOfTomorrow },
-      },
-    },
-    {
       $facet: {
-        approvedToday: [
-          { $match: { status: "APPROVED" } },
+        approvedThisMonth: [
+          {
+            $match: {
+              status: "APPROVED",
+              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
+            },
+          },
           {
             $group: {
               _id: null,
@@ -622,8 +604,13 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
             },
           },
         ],
-        pendingToday: [
-          { $match: { status: "PENDING" } },
+        pendingThisMonth: [
+          {
+            $match: {
+              status: "PENDING",
+              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
+            },
+          },
           {
             $group: {
               _id: null,
@@ -633,7 +620,12 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
           },
         ],
         topDepartment: [
-          { $match: { status: "APPROVED" } },
+          {
+            $match: {
+              status: "APPROVED",
+              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
+            },
+          },
           {
             $group: {
               _id: "$raisedBy.dept",
@@ -645,7 +637,12 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
           { $limit: 1 },
         ],
         topEmployee: [
-          { $match: { status: "APPROVED" } },
+          {
+            $match: {
+              status: "APPROVED",
+              expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
+            },
+          },
           {
             $group: {
               _id: "$raisedBy.userId",
@@ -662,12 +659,12 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
 
   const result = stats?.[0] || {};
 
-  const approvedToday = result.approvedToday?.[0] || {
+  const approvedThisMonth = result.approvedThisMonth?.[0] || {
     totalApprovedAmount: 0,
     approvedCount: 0,
   };
 
-  const pendingToday = result.pendingToday?.[0] || {
+  const pendingThisMonth = result.pendingThisMonth?.[0] || {
     pendingCount: 0,
     pendingAmount: 0,
   };
@@ -677,14 +674,16 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    period: { from: startOfToday, to: startOfTomorrow },
-    approved: {
-      totalApprovedAmount: approvedToday.totalApprovedAmount || 0,
-      approvedCount: approvedToday.approvedCount || 0,
+    month,
+    year,
+    period: { from: startOfMonth, to: startOfNextMonth },
+    approvedThisMonth: {
+      totalApprovedAmount: approvedThisMonth.totalApprovedAmount || 0,
+      approvedCount: approvedThisMonth.approvedCount || 0,
     },
     pending: {
-      pendingCount: pendingToday.pendingCount || 0,
-      pendingAmount: pendingToday.pendingAmount || 0,
+      pendingCount: pendingThisMonth.pendingCount || 0,
+      pendingAmount: pendingThisMonth.pendingAmount || 0,
     },
     topDepartment: topDepartment
       ? {
@@ -707,90 +706,9 @@ export const getTodayAdminStats = asyncHandler(async (req, res) => {
 
 
 
-//GETTING HISTORICAL ADMIN STATS From Pre-aggregated Monthly Stats Collection
-export const getHistoricalAdminStats = asyncHandler(async (req, res) => {
-  const month = Number(req.query.month);
-  const year = Number(req.query.year);
-
-  if (!month || !year) {
-    throw new ApiError(400, "Month and Year are required");
-  }
-
-  if (month < 1 || month > 12) {
-    throw new ApiError(400, "Month must be between 1 and 12");
-  }
-
-  const stats = await HistoricalAdminStatsModel
-    .findOne({ month, year })
-  
-
-  if (!stats) {
-    return res.json({
-      success: true,
-      period: {
-        from: new Date(year, month - 1, 1),
-        to: new Date(year, month, 1),
-      },
-      approved: { totalApprovedAmount: 0, approvedCount: 0 },
-      pending: { pendingAmount: 0, pendingCount: 0 },
-      rejected: { totalAmount: 0, count: 0 },
-      topDepartment: null,
-      topEmployee: null,
-      generatedAt: new Date(),
-    });
-  }
-
-  return res.json({
-    success: true,
-    period: {
-      from: new Date(year, month - 1, 1),
-      to: new Date(year, month, 1),
-    },
-
-    approved: {
-      totalApprovedAmount: stats.approved.totalAmount,
-      approvedCount: stats.approved.count,
-    },
-
-    pending: {
-      pendingAmount: stats.pending.totalAmount,
-      pendingCount: stats.pending.count,
-    },
-
-    rejected: {
-      totalAmount: stats.rejected.totalAmount,
-      count: stats.rejected.count,
-    },
-
-    topDepartment: stats.topDepartment
-      ? {
-          department: stats.topDepartment.department,
-          total: stats.topDepartment.totalAmount,
-        }
-      : null,
-
-    topEmployee: stats.topEmployee
-      ? {
-          userId: stats.topEmployee.userId,
-          total: stats.topEmployee.totalAmount,
-        }
-      : null,
-      
-  byEmployee: stats.empTotals
-    ? Object.fromEntries(stats.empTotals)
-    : {},
-
-  byDepartment: stats.deptTotals
-    ? Object.fromEntries(stats.deptTotals)
-    : {},
-
-    generatedAt: stats.updatedAt,
-  });
-});
 
 
-
-//MONTH WISE EXPENSES TOTALS
+//MONTH WISE EXPENSES TOTALS(FOR ADMIN)
 export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   const now = new Date();
   const year = Number(req.query.year) || now.getFullYear();
@@ -802,7 +720,7 @@ export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   const result = await expenseModel.aggregate([
     {
       $match: {
-        status: statusFilter,
+        // status: statusFilter,
         expenseDate: { $gte: start, $lt: end },
       },
     },
@@ -941,7 +859,6 @@ export const deleteExpense = asyncHandler(async (req, res) => {
     });
   }
 
-  // Fallback safety
   throw new ApiError(403, "Unauthorized action");
 });
 

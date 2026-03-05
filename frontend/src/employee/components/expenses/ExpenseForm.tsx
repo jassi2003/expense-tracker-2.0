@@ -106,24 +106,24 @@ const CreateExpenseForm: React.FC<Props> = ({
   };
 
   const validate = () => {
-     const MAX_AMOUNT = 5000000;
+    const MAX_AMOUNT = 5000000;
 
     if (!form.title.trim()) return "Title is required";
     if (!form.expenseDate) return "Expense date is required";
     if (!selectedFile) return "Receipt file is required";
-   
- if (!Number.isFinite(form.amount))
-    return "Invalid amount";
 
-  if (form.amount <= 0)
-    return "Amount must be greater than 0";
+    if (!Number.isFinite(form.amount))
+      return "Invalid amount";
 
-  if (form.amount > MAX_AMOUNT)
-    return "Amount exceeds allowed limit";
+    if (form.amount <= 0)
+      return "Amount must be greater than 0";
 
-  if (!form.currency) return "Currency required";
+    if (form.amount > MAX_AMOUNT)
+      return "Amount exceeds allowed limit";
 
-  return "";
+    if (!form.currency) return "Currency required";
+
+    return "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,7 +175,7 @@ const CreateExpenseForm: React.FC<Props> = ({
     } catch (err: any) {
       setError(
         err.response?.data?.message ||
-          "Failed to create expense"
+        "Failed to create expense"
       );
     } finally {
       setLoading(false);
@@ -212,35 +212,35 @@ const CreateExpenseForm: React.FC<Props> = ({
           className="w-full border rounded px-3 py-2"
         />
 
-       <input
-  type="text"
-  name="amount"
-  value={form.amount}
-  onChange={(e) => {
-    const value = e.target.value.trim();
+        <input
+          type="text"
+          name="amount"
+          value={form.amount}
+          onChange={(e) => {
+            const value = e.target.value.trim();
 
-    // Allow only numbers with max 2 decimals
-    if (!/^\d*\.?\d{0,2}$/.test(value)) return;
+            // Allow only numbers with max 2 decimals
+            if (!/^\d*\.?\d{0,2}$/.test(value)) return;
 
-    const num = Number(value);
+            const num = Number(value);
 
-    // Block NaN, Infinity, negative
-    if (!Number.isFinite(num) || num < 0) return;
+            // Block NaN, Infinity, negative
+            if (!Number.isFinite(num) || num < 0) return;
 
-    // Block very large values
-    const MAX_AMOUNT = 5000000;
-    if (num > MAX_AMOUNT) {
-      setError("Amount exceeds allowed limit");
-      return;
-    }
+            // Block very large values
+            const MAX_AMOUNT = 5000000;
+            if (num > MAX_AMOUNT) {
+              setError("Amount exceeds allowed limit");
+              return;
+            }
 
-    setError("");
-    setForm({ ...form, amount: num });
-  }}
-  inputMode="decimal"
-  placeholder="Enter amount"
-  className="w-full border rounded px-3 py-2"
-/>
+            setError("");
+            setForm({ ...form, amount: num });
+          }}
+          inputMode="decimal"
+          placeholder="Enter amount"
+          className="w-full border rounded px-3 py-2"
+        />
 
         {/* Searchable Currency Selector */}
         <Select
@@ -258,6 +258,7 @@ const CreateExpenseForm: React.FC<Props> = ({
           name="expenseDate"
           value={form.expenseDate}
           onChange={handleChange}
+          onKeyDown={(e) => e.preventDefault()}
           className="w-full border rounded px-3 py-2"
         />
 

@@ -26,7 +26,7 @@ function dayKey(dateStr) {
   return DAYS[d.getDay()];
 }
 
-// Worker receiving message from employee controller/UI
+// Worker receiving message from employee controller
 self.onmessage = (e) => {
   const { type, payload } = e.data;
   if (type !== "GENERATE_EMPLOYEE_REPORT") return;
@@ -36,10 +36,8 @@ self.onmessage = (e) => {
     fromDate,
     toDate,
     // pass logged in employee identifier from UI:
-    // (use whichever you store: userId from token)
     employeeUserId,
-    // optionally control which statuses count toward totals
-    includeStatuses = ["APPROVED"], // default: only approved
+    includeStatuses = ["APPROVED"],
   } = payload;
 
   const from = new Date(fromDate);
@@ -53,14 +51,13 @@ self.onmessage = (e) => {
     totalAmount: 0,
     expenseCount: 0,
 
-    // breakdowns
     byStatus: {},      // { APPROVED: {total,count}, PENDING: ... }
     byMonth: {},       // { "2026-02": {total,count} }
     byTag: {},         // { Travel: {total,count} }
     byDayOfWeek: {},   // { Mon: {total,count} }
 
     // top items
-    topExpenses: [],   // [{ title, amount, date, status, tags }]
+    topExpenses: [],   
 
     // helpful metadata
     currency: "INR",
