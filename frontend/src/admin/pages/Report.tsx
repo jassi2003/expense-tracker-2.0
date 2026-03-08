@@ -20,6 +20,9 @@ export default function ReportPage() {
   const [deptList, setDeptList] = useState<any[]>([]);
   const [selectedDept, setSelectedDept] = useState("");
 
+  const [deptTotalPages, setDeptTotalPages] = useState(1);
+const [userTotalPages, setUserTotalPages] = useState(1);
+
   const token = localStorage.getItem("token");
 
   // 2. Updated Generate Report Logic
@@ -93,6 +96,7 @@ export default function ReportPage() {
           }
         );
         setDepartments(res.data.data);
+        setDeptTotalPages(res.data.deptTotalPages);
       } catch (err) {
         console.error("Department API failed", err);
       }
@@ -119,6 +123,7 @@ export default function ReportPage() {
           }
         );
         setUsers(res.data.data);
+        setUserTotalPages(res.data.userTotalPages);
       } catch (err) {
         console.error("User API failed", err);
       }
@@ -172,16 +177,18 @@ export default function ReportPage() {
 
       {/* REPORT SECTION */}
       {generated && (
-        <GenerateReport
-          report={report}
-          deptPage={deptPage}
-          setDeptPage={setDeptPage}
-          userPage={userPage}
-          setUserPage={setUserPage}
-          deptList={deptList}
-          selectedDept={selectedDept}
-          setSelectedDept={setSelectedDept}
-        />
+       <GenerateReport
+  report={report}
+  deptPage={deptPage}
+  setDeptPage={setDeptPage}
+  userPage={userPage}
+  setUserPage={setUserPage}
+  deptList={deptList}
+  selectedDept={selectedDept}
+  setSelectedDept={setSelectedDept}
+  deptTotalPages={deptTotalPages}
+  userTotalPages={userTotalPages}
+/>
       )}
     </div>
   );

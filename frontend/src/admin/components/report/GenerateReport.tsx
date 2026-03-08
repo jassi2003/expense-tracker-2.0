@@ -8,6 +8,8 @@ type Props = {
   deptList: any[];
   selectedDept: string;
   setSelectedDept: (dept: string) => void;
+  deptTotalPages: number;
+userTotalPages: number;
 };
 
 const MONTH_NAMES = [
@@ -46,10 +48,14 @@ const DataTable = ({
   deptList,
   selectedDept,
   setSelectedDept,
-  setUserPage
+  setUserPage,
+  userTotalPages,
+  deptTotalPages
 }: any) => {
 
   const grouped = groupByMonth(data);
+
+  const totalPages = isEmployee ? userTotalPages : deptTotalPages;
 
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
@@ -98,12 +104,14 @@ const DataTable = ({
               Prev
             </button>
 
-            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md font-medium">
-              {page}
-            </span>
+  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-md font-medium">
+    Page {page} of {totalPages || 1}
+  </span>
+
 
             <button
-              onClick={() => setPage(page + 1)}
+                 disabled={page === totalPages}
+    onClick={() => page < totalPages && setPage(page + 1)}
               className="px-3 py-1 border rounded-md bg-white hover:bg-gray-100"
             >
               Next
@@ -237,7 +245,9 @@ export default function GenerateReport({
   setUserPage,
   deptList,
   selectedDept,
-  setSelectedDept
+  setSelectedDept,
+  deptTotalPages,
+userTotalPages
 }: Props) {
 
   const summary = report?.overallSummary?.[0] || {};
@@ -292,6 +302,7 @@ export default function GenerateReport({
         data={report.byDepartment}
         page={deptPage}
         setPage={setDeptPage}
+deptTotalPages={deptTotalPages}
       />
 
       <DataTable
@@ -304,6 +315,8 @@ export default function GenerateReport({
         selectedDept={selectedDept}
         setSelectedDept={setSelectedDept}
         setUserPage={setUserPage}
+  userTotalPages={userTotalPages}
+
       />
 
     </div>

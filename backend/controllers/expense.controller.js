@@ -8,6 +8,9 @@ import { v2 as cloudinary } from 'cloudinary'
 import { getOverallAnalyticsService } from "../services/analytics.service.js";
 import { getDepartmentAnalyticsService } from "../services/analytics.service.js";
 import { getUserAnalyticsService } from "../services/analytics.service.js";
+import { sendReportJob } from "../services/sqsProducer.service.js";
+
+
 
 //ADDING EXPENSE
 export const addExpense = asyncHandler(async (req, res) => {
@@ -89,9 +92,6 @@ export const addExpense = asyncHandler(async (req, res) => {
     }
   }
 
-
-
-
   const created = await expenseModel.create({
     title: title.trim(),
     amount: Number(inrAmount.toFixed(2)),
@@ -122,7 +122,7 @@ export const addExpense = asyncHandler(async (req, res) => {
 
 
 
-//GETTING ALL EXPENSES by LOGGED IN USER
+//GETTING ALL EXPENSES of LOGGED IN USER
 export const getMyExpenses = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
 
@@ -516,7 +516,7 @@ export const rejectExpense = asyncHandler(async (req, res) => {
 
 
 
-// REPORT GENERATION
+// REPORT GENERATION FOR DASHBOARD
 // //overall monthly stats
 export const getOverallAnalytics = asyncHandler(async (req, res) => {
   const { fromDate, toDate } = req.query;
@@ -529,7 +529,6 @@ export const getOverallAnalytics = asyncHandler(async (req, res) => {
     data
   });
 });
-
 
 
 //getdepartmernt analytics
@@ -704,10 +703,6 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
 });
 
 
-
-
-
-
 //MONTH WISE EXPENSES TOTALS(FOR ADMIN)
 export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   const now = new Date();
@@ -767,7 +762,6 @@ export const getAllExpensesAdmin = asyncHandler(async (req, res) => {
   if (req.user?.role !== "ADMIN") {
     throw new ApiError(403, "Access denied");
   }
-
   const page = Math.max(parseInt(req.query.page) || 1, 1);
   const requestedLimit = parseInt(req.query.limit) || 6;
   const limit = Math.min(Math.max(requestedLimit, 1), 50);
@@ -901,6 +895,21 @@ export const getTagAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
+
+//REPORT GENERATION FOR ADMIN
+export const generateReportController = async (req, res) => {
+  const { fromDate, toDate,email } = req.query;
+  const messageId = await sendReportJob({
+    fromDate,
+    toDate,
+    email
+  });
+  res.json({
+    success: true,
+    message: "Report generation started",
+    jobId: messageId
+  });
+};
 
 
 
