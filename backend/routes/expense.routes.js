@@ -13,7 +13,8 @@ import {
     getAdminDashboardStats,
     getUserAnalytics,
     getDepartmentAnalytics,
-    getOverallAnalytics
+    getOverallAnalytics,
+    generateReportController
 } from "../controllers/expense.controller.js"
 import authUser from "../middlewares/authUser.js"
 import upload from "../middlewares/multer.js"
@@ -32,6 +33,8 @@ expenseRoutes.get("/admin-dashboard-stats", authUser, getAdminDashboardStats)
 expenseRoutes.get("/report-overall", authUser, getOverallAnalytics)
 expenseRoutes.get("/report-department", authUser, getDepartmentAnalytics)
 expenseRoutes.get("/report-user", authUser, getUserAnalytics)
+expenseRoutes.post("/generate-report", authUser, generateReportController)
+
 
 
 expenseRoutes.get("/monthly-expense-summary", authUser, getMonthlyExpenseSummary)

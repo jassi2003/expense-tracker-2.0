@@ -1,9 +1,6 @@
 import cron from "node-cron";
 import { updateExchangeRates } from "../services/exchangeRate.service.js";
 
-
-
-
 //EXCHANGE RATE CRON 
 export const exchangeRateCron = cron.schedule("0 * * * *", async () => {
   console.log(" Running scheduled exchange rate update...");

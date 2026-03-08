@@ -154,7 +154,7 @@ departmentUtilization: {
   return {
     page: Number(page),
     totalRecords,
-    totalPages: Math.ceil(totalRecords / limit),
+    deptTotalPages: Math.ceil(totalRecords / limit),
     data
   };
 };
@@ -164,7 +164,7 @@ departmentUtilization: {
 
 
 
-// //user analytics
+ //user analytics
 export const getUserAnalyticsService = async ({
   fromDate,
   toDate,
@@ -252,7 +252,7 @@ export const getUserAnalyticsService = async ({
   return {
     page: Number(page),
     totalRecords,
-    totalPages: Math.ceil(totalRecords / limit),
+    userTotalPages: Math.ceil(totalRecords / limit),
     data
   };
 };
