@@ -6,6 +6,8 @@ import Departments from "@/admin/pages/Departments";
 import  User from "@/admin/pages/User";
 import Report from "@/admin/pages/Report";
 import Expenses from "@/admin/pages/Expenses";
+import PurchaseRequests from "@/admin/pages/PurchaseRequests";
+
 
 export default function AdminRoutes() {
   return (
@@ -20,6 +22,7 @@ export default function AdminRoutes() {
         <Route path="/departments" element={<Departments />} />
         <Route path="/report" element={<Report />} />
         <Route path="/expenses" element={<Expenses />} />
+        <Route path="/purchaseRequests" element={<PurchaseRequests />} />
 
       </Route>
     </Routes>

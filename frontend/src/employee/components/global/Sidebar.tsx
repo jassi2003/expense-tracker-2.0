@@ -25,6 +25,8 @@ type SidebarProps = {
 const items: Item[] = [
   { id: "dashboard", label: "Dashboard", href: "/employee/dashboard", icon: <Briefcase className="h-5 w-5" /> },
   { id: "expenses", label: "Expenses", href: "/employee/expenses", icon: <Clock3 className="h-5 w-5" /> },
+  { id: "expenseReport", label: "Make a Report", href: "/employee/expenseReport", icon: <Clock3 className="h-5 w-5" /> },
+  { id: "purchaseRequests", label: "Purchase Requests", href: "/employee/purchaseRequests", icon: <Clock3 className="h-5 w-5" /> },
   { id: "reports", label: "Reports", href: "/employee/reports", icon: <ShoppingBag className="h-5 w-5" /> },
 ];
 

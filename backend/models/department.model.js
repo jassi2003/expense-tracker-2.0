@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
 const departmentSchmema = new mongoose.Schema({
+      organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Organization",
+    required: true
+  },
     departmentName: { type: String, required: true, unique: true, trim: true, uppercase: true },
     totalBudget: { type: Number, required: true, min: 0, },
     consumedBudget: { type: Number, required: true,default:0,min:0 },
@@ -8,6 +13,10 @@ const departmentSchmema = new mongoose.Schema({
 
 },{ timestamps: true })
 
+departmentSchmema.index(
+  { organizationId: 1, departmentName: 1 },
+  { unique: true }
+);
 
 
 

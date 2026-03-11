@@ -62,7 +62,7 @@ const login = useCallback(async (email: string, password: string) => {
     const res = await axios.post(
       "http://localhost:8000/api/user/login-user",
       {
-        email: email.trim().toLowerCase(),
+        email: email.trim(),
         password,
       }
     );

@@ -34,13 +34,18 @@ const expenseSchema = new mongoose.Schema({
     status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
     exchangeRate: {type: Number, required: true,},
     raisedBy: { type: raisedBySchema, required: true },
- departmentSnapshot: {type: departmentSnapshotSchema,required: true}
+ departmentSnapshot: {type: departmentSnapshotSchema,required: true},
+reportId: { type: mongoose.Schema.Types.ObjectId, ref: "ReportData", default: null },
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Organization",
+    required: true
+  }
 
 }, { timestamps: true })
 
 expenseSchema.index({"raisedBy.userId": 1,status: 1});
 expenseSchema.index({"raisedBy.dept": 1,status: 1});
 expenseSchema.index({ expenseDate: 1 })
-
 
 export default mongoose.model("ExpenseModel", expenseSchema);

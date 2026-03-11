@@ -7,7 +7,13 @@ import ApiError from "../utils/ApiError.js";
 export const addDepartment = asyncHandler(async (req, res) => {
   const { departmentName, totalBudget, isActive } = req.body;
 
-  if (!departmentName ||  totalBudget === null) {
+  const organizationId = req.user?.organizationId;
+
+  if (!organizationId) {
+    throw new ApiError(401, "Organization not found in token");
+  }
+
+  if (!departmentName || totalBudget === null) {
     throw new ApiError(400, "Department name and total budget are required");
   }
 
@@ -20,6 +26,7 @@ export const addDepartment = asyncHandler(async (req, res) => {
     totalBudget: Number(totalBudget),
     consumedBudget: 0,
     isActive: isActive ?? true,
+    organizationId
   });
 
   res.status(201).json({
@@ -34,7 +41,10 @@ export const addDepartment = asyncHandler(async (req, res) => {
 export const getAllDepartments = asyncHandler(async (req, res) => {
   const { isActive } = req.query;
 
-  const filter = {};
+  const organizationId = req.user?.organizationId;
+
+  const filter = { organizationId };
+
   if (isActive !== undefined) {
     filter.isActive = isActive === "true";
   }
@@ -56,9 +66,13 @@ export const getAllDepartments = asyncHandler(async (req, res) => {
 export const updateDepartment = asyncHandler(async (req, res) => {
   const { departmentId } = req.params;
   const { departmentName, totalBudget } = req.body;
+  const organizationId = req.user?.organizationId;
 
-  const department = await departmentModel.findById(departmentId);
 
+  const department = await departmentModel.findOne({
+    _id: departmentId,
+    organizationId
+  });
   if (!department) {
     throw new ApiError(404, "Department not found");
   }
@@ -94,7 +108,12 @@ export const updateDepartment = asyncHandler(async (req, res) => {
 export const activateDepartment = asyncHandler(async (req, res) => {
   const { departmentId } = req.params;
 
-  const department = await departmentModel.findById(departmentId);
+  const organizationId = req.user?.organizationId;
+
+  const department = await departmentModel.findOne({
+    _id: departmentId,
+    organizationId
+  });
 
   if (!department) {
     throw new ApiError(404, "Department not found");
@@ -121,7 +140,12 @@ export const activateDepartment = asyncHandler(async (req, res) => {
 export const deactivateDepartment = asyncHandler(async (req, res) => {
   const { departmentId } = req.params;
 
-  const department = await departmentModel.findById(departmentId);
+  const organizationId = req.user?.organizationId;
+
+  const department = await departmentModel.findOne({
+    _id: departmentId,
+    organizationId
+  });
 
   if (!department) {
     throw new ApiError(404, "Department not found");

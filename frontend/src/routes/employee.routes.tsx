@@ -5,6 +5,8 @@ import ProtectedRoute from "@/auth/ProtectedRouted";
 import Dashboard from "@/employee/pages/Dashboard";
 import Reports from "@/employee/pages/Reports";
 import Expenses from "@/employee/pages/Expenses";
+import ExpenseReport from "@/employee/pages/ExpenseReport";
+import PurchaseRequests from "@/employee/pages/PurchaseRequests";
 
 export default function EmployeeRoutes() {
   return (
@@ -17,6 +19,8 @@ export default function EmployeeRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/expenses" element={<Expenses />} />
+        <Route path="/expenseReport" element={<ExpenseReport />} />
+        <Route path="/purchaseRequests" element={<PurchaseRequests />} />
       </Route>
     </Routes>
   );

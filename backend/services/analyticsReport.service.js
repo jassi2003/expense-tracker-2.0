@@ -1,4 +1,4 @@
-import { getOverallAnalyticsService,getDepartmentAnalyticsService,getUserAnalyticsService } from "./analytics.service.js";
+import { getOverallAnalyticsService, getDepartmentAnalyticsService, getUserAnalyticsService } from "./analytics.service.js";
 import { generateExpenseExcel } from "../utils/excelFileGenerator.js";
 import { sendReportEmail } from "../utils/mailer.js";
 
@@ -8,26 +8,39 @@ import { sendReportEmail } from "../utils/mailer.js";
 export const generateAndSendReport = async ({
   fromDate,
   toDate,
-  email
+  email,
+  organizationId
+
 }) => {
+
+
+  if (!organizationId) {
+    throw new Error("organizationId is required for report generation");
+  }
 
   console.log("Generating report...");
 
   const overall = await getOverallAnalyticsService({
     fromDate,
-    toDate
+    toDate,
+    organizationId
+
   });
 
   const dept = await getDepartmentAnalyticsService({
     fromDate,
     toDate,
-    paginate: false
+    paginate: false,
+    organizationId
+
   });
 
   const users = await getUserAnalyticsService({
     fromDate,
     toDate,
-    paginate: false
+    paginate: false,
+    organizationId
+
   });
 
   const excelBuffer = await generateExpenseExcel({

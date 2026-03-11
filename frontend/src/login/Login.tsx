@@ -20,37 +20,42 @@ export default function LoginPage() {
     return "";
   };
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
 
-  const v = validate();
-  if (v) return setError(v);
+    const v = validate();
+    if (v) return setError(v);
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const role = await login(email, password); // login returns "ADMIN" | "EMPLOYEE"
+      const role = await login(email, password); // login returns "ADMIN" | "EMPLOYEE"
 
-    console.log("Role from login():", role);
+      console.log("Role from login():", role);
 
-if (role) {
-  localStorage.setItem("role", role);
-}
-    if (role === "ADMIN") {
-      navigate("/admin/dashboard", { replace: true });
-    } else {
-      navigate("/employee/dashboard", { replace: true });
+      if (role) {
+        localStorage.setItem("role", role);
+      }
+      if (role === "ADMIN") {
+        navigate("/admin/dashboard", { replace: true });
+
+      } else if (role === "EMPLOYEE") {
+        navigate("/employee/dashboard", { replace: true });
+      }
+      else {
+        navigate("/superAdmin/dashboard", { replace: true });
+
+      }
+    } catch (err: any) {
+      setError(err?.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    setError(err?.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
-<div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
@@ -98,7 +103,7 @@ if (role) {
             {loading ? "Logging in..." : "Login"}
           </button>
 
-       
+
         </form>
       </div>
     </div>

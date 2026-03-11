@@ -14,7 +14,8 @@ import {
     getUserAnalytics,
     getDepartmentAnalytics,
     getOverallAnalytics,
-    generateReportController
+    generateReportController,
+    scanReceiptController
 } from "../controllers/expense.controller.js"
 import authUser from "../middlewares/authUser.js"
 import upload from "../middlewares/multer.js"
@@ -35,13 +36,12 @@ expenseRoutes.get("/report-department", authUser, getDepartmentAnalytics)
 expenseRoutes.get("/report-user", authUser, getUserAnalytics)
 expenseRoutes.post("/generate-report", authUser, generateReportController)
 
-
+expenseRoutes.post("/scan-receipt", authUser,upload.single("receipt"), scanReceiptController)
 
 expenseRoutes.get("/monthly-expense-summary", authUser, getMonthlyExpenseSummary)
 expenseRoutes.get("/all-expenses-admin", authUser, getAllExpensesAdmin)
 expenseRoutes.get("/expense-by-id/:id", authUser, getExpenseById)
 expenseRoutes.delete("/delete-expense/:id", authUser, deleteExpense)
 expenseRoutes.get("/tag-analytics", authUser, getTagAnalytics)
-
 
 export default expenseRoutes

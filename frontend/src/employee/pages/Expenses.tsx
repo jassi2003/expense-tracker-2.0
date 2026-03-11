@@ -68,6 +68,32 @@ const Expenses = () => {
     }
   }, [page, selectedStatus]);
 
+//scan the receipt
+const scanReceipt = async (file: File) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const formData = new FormData();
+    formData.append("receipt", file);
+
+    const res = await axios.post(
+      "http://localhost:8000/api/expenses/scan-receipt",
+      formData,
+      {
+        headers: {
+          token,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    return res.data.extractedData;
+  } catch (err) {
+    console.error("Scan failed");
+    return null;
+  }
+};
+
 
   //UPDATE EXPENSE HANDLER
   const handleUpdateExpense = async (
@@ -162,6 +188,7 @@ const Expenses = () => {
   <div className="fixed inset-0 z-50 bg-blue-900/40 backdrop-blur-md flex justify-center items-center">
     <div className="w-full max-w-md">
       <CreateExpenseForm
+        scanReceipt={scanReceipt}
         onCreated={async () => {
           await fetchExpenses();
           setShowCreateModal(false);

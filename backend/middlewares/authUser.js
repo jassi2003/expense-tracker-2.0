@@ -20,6 +20,8 @@ const authUser = async (req, res, next) => {
         const token_decode = jwt.verify(token, process.env.JWT_SECRET);
         // console.log("Decoded Token:", token_decode);
         req.user = token_decode.payload;
+console.log("tokendecode",token_decode)        
+
         next();
 
     } catch (err) {

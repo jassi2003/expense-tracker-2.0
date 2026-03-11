@@ -1,14 +1,12 @@
 import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "@/employee/components/global/Sidebar";
-import AppHeader from "@/employee/components/global/Header";
 
 export default function EmployeeLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="h-screen flex flex-col bg-slate-100">
-      {/* <AppHeader /> */}
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar

@@ -1,5 +1,4 @@
 import { Outlet } from "react-router-dom";
-import Header from "@/admin/components/global/Header";
 import Sidebar from "@/admin/components/global/Sidebar";
 import { useEffect, useState } from "react";
 import axios from "axios";

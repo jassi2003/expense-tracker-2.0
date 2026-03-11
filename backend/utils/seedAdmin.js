@@ -15,7 +15,7 @@ export async function seedAdminIfMissing() {
   const email = requireEnv("ADMIN_EMAIL").toLowerCase();
   const password = requireEnv("ADMIN_PASSWORD");
 
-        const existingAdmin = await userModel.findOne({ role: "ADMIN" }).lean();
+        const existingAdmin = await userModel.findOne({ role: "SUPERADMIN" }).lean();
 
         if (!existingAdmin) {
             const salt = await bcrypt.genSalt(10);
@@ -26,14 +26,14 @@ export async function seedAdminIfMissing() {
                 name,
                 email,
                 password: hashed,
-                role: "ADMIN",
+                role: "SUPERADMIN",
                 isActive: true,
             });
-            console.log(" Admin seeded in MongoDB");
+            console.log("super Admin seeded in MongoDB");
 
 
             return res.status(201).json({
-                message: "Admin seeded successfully",
+                message: "super Admin seeded successfully",
                 data: adminSeed,
                 success: true
             })

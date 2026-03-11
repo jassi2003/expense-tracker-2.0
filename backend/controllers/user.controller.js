@@ -14,6 +14,9 @@ export const addEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
+    const organizationId = req.user.organizationId;
+
+
   const normalizedEmail = email.toLowerCase().trim();
   const normalizedUserId = userId.toLowerCase().trim();
 
@@ -28,6 +31,7 @@ export const addEmployee = asyncHandler(async (req, res) => {
     password: passwordHash,
     role: "EMPLOYEE",
     isActive: true,
+    organizationId
   });
 
   return res.status(201).json({
@@ -41,6 +45,8 @@ export const addEmployee = asyncHandler(async (req, res) => {
       password: created.password,
       role: created.role,
       createdAt: created.createdAt,
+      organizationId
+
     },
   });
 });
@@ -51,6 +57,8 @@ export const loginUser = asyncHandler(async (req, res) => {
   await seedAdminIfMissing();
 
   const { email, password } = req.body;
+
+console.log(req.body)
 
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
@@ -76,6 +84,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     userId: findUser.userId,
     role: findUser.role,
     dept: findUser.empdepartment,
+    organizationId:findUser.organizationId
   };
 
   const token = jwt.sign({ payload }, process.env.JWT_SECRET);
@@ -96,14 +105,17 @@ export const getAllUsers = asyncHandler(async (req, res) => {
   const limit = Math.max(parseInt(req.query.limit) || 6, 1);
   const skip = (page - 1) * limit;
 
-  const totalUsers = await userModel.countDocuments();
+const organizationId = req.user.organizationId;
+
+
+  const totalUsers = await userModel.countDocuments({organizationId});
 
   if (totalUsers === 0) {
     throw new ApiError(404, "No users found");
   }
 
   const users = await userModel
-    .find()
+    .find({organizationId})
     .select("-password")
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -127,13 +139,14 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 //GET USER BY USERID 
 export const getUserByUserId = asyncHandler(async (req, res) => {
   const { userId } = req.params;
+const organizationId = req.user.organizationId;
 
   if (!userId) {
     throw new ApiError(400, "User ID is required");
   }
 
   const user = await userModel
-    .findOne({ userId })
+    .findOne({ userId,    organizationId })
     .select("-password");
 
   if (!user) {
@@ -160,7 +173,10 @@ export const deactivateUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User ID is required");
   }
 
-  const user = await userModel.findById(id);
+const user = await userModel.findOne({
+  _id: id,
+  organizationId: req.user.organizationId
+});
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -199,7 +215,10 @@ export const activateUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User ID is required");
   }
 
-  const user = await userModel.findById(id);
+const user = await userModel.findOne({
+  _id: id,
+  organizationId: req.user.organizationId
+});
 
   if (!user) {
     throw new ApiError(404, "User not found");

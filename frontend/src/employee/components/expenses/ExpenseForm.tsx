@@ -9,14 +9,22 @@ interface ExpenseFormData {
   expenseDate: string;
 }
 
+interface ReportOption {
+  value: string | null;
+  label: string;
+}
+
 interface Props {
   onCreated: () => void;
   onClose: () => void;
+  scanReceipt: (file: File) => Promise<any>;
+
 }
 
 const CreateExpenseForm: React.FC<Props> = ({
   onCreated,
   onClose,
+  scanReceipt
 }) => {
   const [form, setForm] = useState<ExpenseFormData>({
     title: "",
@@ -31,10 +39,13 @@ const CreateExpenseForm: React.FC<Props> = ({
 
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState("");
-  const [selectedFile, setSelectedFile] =
-    useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [reportOptions, setReportOptions] = useState<ReportOption[]>([]);
+  const [selectedReport, setSelectedReport] = useState<ReportOption | null>(null);
+  const [scanning, setScanning] = useState(false);
+
 
   //  Fetch currencies once
   useEffect(() => {
@@ -55,7 +66,6 @@ const CreateExpenseForm: React.FC<Props> = ({
             label: c,
           })
         );
-
         setCurrencyOptions(formatted);
       } catch (err) {
         console.error("Failed to load currencies");
@@ -63,6 +73,38 @@ const CreateExpenseForm: React.FC<Props> = ({
     };
 
     fetchCurrencies();
+  }, []);
+
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:8000/api/expenseReport/my-reports",
+          {
+            headers: {
+              token: localStorage.getItem("token"),
+            },
+          }
+        );
+
+        const reports = res.data.reports || [];
+
+        const formatted = [
+          { value: null, label: "No Report" },
+          ...reports.map((r: any) => ({
+            value: r._id,
+            label: r.reportName,
+          })),
+        ];
+
+        setReportOptions(formatted);
+      } catch (err) {
+        console.error("Failed to fetch reports");
+      }
+    };
+
+    fetchReports();
   }, []);
 
   const handleChange = (
@@ -89,6 +131,8 @@ const CreateExpenseForm: React.FC<Props> = ({
       setSelectedFile(e.target.files[0]);
     }
   };
+
+
 
   const handleAddTag = () => {
     const trimmed = currentTag.trim().toLowerCase();
@@ -126,6 +170,37 @@ const CreateExpenseForm: React.FC<Props> = ({
     return "";
   };
 
+//SCANNING RECEIPT
+  const handleScanReceipt = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  if (!e.target.files?.[0]) return;
+
+  const file = e.target.files[0];
+setScanning(true);
+  setSelectedFile(file);
+
+try{
+  const data = await scanReceipt(file);
+
+  if (data) {
+    setForm({
+      title: data.title || "",
+      amount: data.amount || 0,
+      currency: data.currency || "INR",
+      expenseDate: data.expenseDate
+        ? data.expenseDate.split(" ")[0]
+        : "",
+    });
+  }
+}
+catch (err) {
+    console.error("Scan failed");
+  } finally {
+    setScanning(false); // STOP LOADER
+  }};
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -145,12 +220,15 @@ const CreateExpenseForm: React.FC<Props> = ({
       formData.append("currency", form.currency);
       formData.append("expenseDate", form.expenseDate);
       formData.append("tags", JSON.stringify(tags));
+      if (selectedReport?.value) {
+        formData.append("reportId", selectedReport.value);
+      }
 
       if (selectedFile) {
         formData.append("receipt", selectedFile);
       }
 
-      await axios.post(
+      const res = await axios.post(
         "http://localhost:8000/api/expenses/add-expense",
         formData,
         {
@@ -160,6 +238,7 @@ const CreateExpenseForm: React.FC<Props> = ({
           },
         }
       );
+
 
       setForm({
         title: "",
@@ -202,8 +281,25 @@ const CreateExpenseForm: React.FC<Props> = ({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
+
+      {scanning && (
+  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 z-20 rounded-xl">
+    
+    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+
+    <p className="mt-3 text-sm text-gray-700 font-medium">
+      Scanning receipt, please wait...
+    </p>
+
+  </div>
+)}
+
+<form
+  onSubmit={handleSubmit}
+  className={`space-y-4 transition ${
+    scanning ? "opacity-40 pointer-events-none" : ""
+  }`}
+>        <input
           type="text"
           name="title"
           placeholder="Title"
@@ -253,6 +349,8 @@ const CreateExpenseForm: React.FC<Props> = ({
           placeholder="Select Currency"
         />
 
+
+
         <input
           type="date"
           name="expenseDate"
@@ -260,6 +358,14 @@ const CreateExpenseForm: React.FC<Props> = ({
           onChange={handleChange}
           onKeyDown={(e) => e.preventDefault()}
           className="w-full border rounded px-3 py-2"
+        />
+
+        <Select
+          options={reportOptions}
+          value={selectedReport}
+          onChange={(option) => setSelectedReport(option)}
+          isSearchable
+          placeholder="Select Report (optional)"
         />
 
         {/* TAGS */}
@@ -305,12 +411,47 @@ const CreateExpenseForm: React.FC<Props> = ({
         </div>
 
         {/* FILE */}
-        <input
-          type="file"
-          accept="image/*,application/pdf"
-          onChange={handleFileChange}
-          className="w-full border rounded px-3 py-2"
-        />
+      {/* RECEIPT OPTIONS */}
+
+<div className="space-y-3">
+
+  <label className="text-sm font-medium text-gray-600">
+    Receipt
+  </label>
+
+  <div className="flex gap-3">
+
+    {/* Scan Receipt */}
+    <label className="flex-1 border rounded-lg p-3 text-center cursor-pointer hover:bg-gray-50">
+      📷 Scan Receipt
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleScanReceipt}
+        className="hidden"
+      />
+    </label>
+
+    {/* Manual Upload */}
+    <label className="flex-1 border rounded-lg p-3 text-center cursor-pointer hover:bg-gray-50">
+      ⬆ Upload Receipt
+      <input
+        type="file"
+        accept="image/*,application/pdf"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+    </label>
+
+  </div>
+
+  {selectedFile && (
+    <p className="text-xs text-gray-500">
+      Selected: {selectedFile.name}
+    </p>
+  )}
+
+</div>
 
         <button
           type="submit"

@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 type Props = {
   children: JSX.Element;
-  allowedRole: "ADMIN" | "EMPLOYEE";
+  allowedRole: "ADMIN" | "EMPLOYEE" | "SUPERADMIN";
 };
 
 export default function ProtectedRoute({ children, allowedRole }: Props) {
