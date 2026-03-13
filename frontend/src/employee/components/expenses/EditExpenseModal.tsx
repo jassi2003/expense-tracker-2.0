@@ -183,15 +183,7 @@ const EditExpenseModal: React.FC<Props> = ({
   className="w-full border rounded px-3 py-2"
 />
 
-          {/* <select
-            name="currency"
-            value={form.currency}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          >
-            <option value="INR">INR</option>
-            <option value="USD">USD</option>
-          </select> */}
+      
 
           <input
             type="date"

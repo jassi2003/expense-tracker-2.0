@@ -2,6 +2,9 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import purchaseRequestModel from "../models/purchaseRequest.model.js";
 
+
+
+//RAISE PURCHASE REQUEST
 export const raisePurchaseRequest = asyncHandler(async (req, res) => {
 
   const organizationId = req.user?.organizationId;
@@ -118,13 +121,15 @@ export const submitPurchaseRequest = asyncHandler(async (req, res) => {
 
 
 //ALL PURACHSE REQUESTS BY EMPLOYEE
+// ALL PURCHASE REQUESTS BY EMPLOYEE
 export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
+
   const organizationId = req.user?.organizationId;
   if (!organizationId) {
     throw new ApiError(401, "Organization not found in token");
   }
-  const employeeId = req.user.userId;
 
+  const employeeId = req.user.userId;
   if (!employeeId) {
     throw new ApiError(401, "Unauthorized user");
   }
@@ -133,7 +138,17 @@ export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  const query = { "raisedBy.userId": employeeId, organizationId };
+  const status = req.query.status;
+
+  const query = {
+    "raisedBy.userId": employeeId,
+    organizationId
+  };
+
+  // status filter 
+  if (status && status !== "ALL") {
+    query.status = status;
+  }
 
   const requests = await purchaseRequestModel
     .find(query)
@@ -151,10 +166,11 @@ export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
     totalPages: Math.ceil(total / limit),
     requests
   });
+
 });
 
-
 //ALL EMPLOYEES PURCHAE REQUESTS FOR ADMIN
+// ALL EMPLOYEES PURCHASE REQUESTS FOR ADMIN
 export const getAllPurchaseRequests = asyncHandler(async (req, res) => {
 
   const organizationId = req.user?.organizationId;
@@ -163,37 +179,47 @@ export const getAllPurchaseRequests = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Organization not found in token");
   }
 
-  const { status, dept, page = 1, limit = 10 } = req.query;
+  const { dept, page = 1, limit = 10, status } = req.query;
+
+  const pageNumber = Number(page);
+  const limitNumber = Number(limit);
+
+  const skip = (pageNumber - 1) * limitNumber;
 
   const query = { organizationId };
 
-  // optional filters
-  if (status) {
-    query.status = status;
+  // STATUS FILTER
+  if (status && status !== "ALL") {
+    query.status = status;   // SUBMITTED / APPROVED / REJECTED
+  } else {
+    // If ALL selected → exclude drafts
+    query.status = { $ne: "DRAFT" };
   }
 
+  // DEPARTMENT FILTER
   if (dept) {
     query["raisedBy.dept"] = dept;
   }
-
-  const skip = (Number(page) - 1) * Number(limit);
 
   const requests = await purchaseRequestModel
     .find(query)
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(Number(limit));
+    .limit(limitNumber);
 
   const total = await purchaseRequestModel.countDocuments(query);
 
   return res.status(200).json({
     success: true,
     totalRequests: total,
-    page: Number(page),
+    totalPages: Math.ceil(total / limitNumber),
+    currentPage: pageNumber,
     requests
   });
 
 });
+
+
 
 
 //Approving the request

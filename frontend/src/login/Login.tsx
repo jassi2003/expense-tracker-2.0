@@ -44,7 +44,7 @@ export default function LoginPage() {
         navigate("/employee/dashboard", { replace: true });
       }
       else {
-        navigate("/superAdmin/dashboard", { replace: true });
+        navigate("/superAdmin/organization", { replace: true });
 
       }
     } catch (err: any) {

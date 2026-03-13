@@ -5,7 +5,7 @@ import CreateExpenseForm from "@/employee/components/expenses/ExpenseForm";
 import ExpenseList from "@/employee/components/expenses/AllExpenses";
 import EditExpenseModal from "@/employee/components/expenses/EditExpenseModal";
 
-type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED";
+type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED" | "DRAFT";
 
 export interface Expense {
   _id: string;
@@ -146,6 +146,89 @@ const scanReceipt = async (file: File) => {
     fetchExpenses();
   }, [fetchExpenses]);
 
+
+
+const columns = [
+  {
+    header: "Title",
+    accessor: "title",
+  },
+  {
+    header: "Amount",
+    accessor: "amount",
+    render: (exp: Expense) =>
+      new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: exp.currency,
+      }).format(
+        Number(
+          (exp.originalAmount as any)?.$numberDecimal ??
+            exp.originalAmount
+        )
+      ),
+  },
+  {
+    header: "Date",
+    accessor: "expenseDate",
+    render: (exp: Expense) =>
+      new Date(exp.expenseDate).toLocaleDateString(),
+  },
+  {
+    header: "Tags",
+    accessor: "tags",
+    render: (exp: Expense) => exp.tags?.join(", "),
+  },
+  {
+    header: "Status",
+    accessor: "status",
+  },
+  {
+    header: "Receipt",
+    accessor: "receipt",
+    render: (exp: Expense) =>
+      exp.receipt ? (
+        <button
+          onClick={() => window.open(exp.receipt, "_blank")}
+          className="text-blue-600 hover:underline"
+        >
+          View Receipt
+        </button>
+      ) : (
+        <span className="text-gray-400">No Receipt</span>
+      ),
+  },
+  {
+    header: "Actions",
+    accessor: "actions",
+    render: (exp: Expense) =>
+      exp.status === "PENDING"  ? (
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => setEditingExpense(exp)}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-xs"
+          >
+            Edit
+          </button>
+
+          <button
+            onClick={() => handleDeleteExpense(exp._id)}
+            className="px-3 py-1 bg-red-600 text-white rounded text-xs"
+          >
+            Delete
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => handleDeleteExpense(exp._id)}
+          className="px-3 py-1 bg-red-600 text-white rounded text-xs"
+        >
+          Delete
+        </button>
+      ),
+  },
+];
+
+
   return (
     <div className="min-h-screen bg-gray-100 p-6 sm:p-8">
 
@@ -160,20 +243,20 @@ const scanReceipt = async (file: File) => {
       </div>
 
       <div className="max-w-7xl mx-auto">
-        <ExpenseList
-          expenses={expenses}
-          loading={loading}
-          error={error}
-          onRefresh={fetchExpenses}
-          onEdit={(expense) => setEditingExpense(expense)}
-          page={page}
-          totalPages={totalPages}
-          setPage={setPage}
-          selectedStatus={selectedStatus}
-          setSelectedStatus={setSelectedStatus}
-          onDelete={handleDeleteExpense}
-
-        />
+       <ExpenseList
+  data={expenses}
+  columns={columns}
+  loading={loading}
+  error={error}
+  page={page}
+  totalPages={totalPages}
+  setPage={setPage}
+  filters={{
+    options: ["DRAFT","PENDING", "APPROVED", "REJECTED"],
+    selected: selectedStatus,
+    onChange: (status) => setSelectedStatus(status as ExpenseStatus),
+  }}
+/>
       </div>
 
       {editingExpense && (

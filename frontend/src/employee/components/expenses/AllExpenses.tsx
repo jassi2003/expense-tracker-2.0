@@ -1,171 +1,131 @@
+
+
 import React from "react";
-import type { Expense } from "@/employee/pages/Expenses";
 
-type Props = {
-  expenses: Expense[];
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
-  onEdit: (expense: Expense) => void;
-  page: number;
-  totalPages: number;
-  setPage: React.Dispatch<React.SetStateAction<number>>;
-  selectedStatus: string;
-  setSelectedStatus: (status: any) => void;
-  onDelete: (id: string) => void;
 
+type Column<T> = {
+  header: string;
+  accessor: keyof T | string;
+  render?: (row: T) => React.ReactNode;
+  className?: string;
 };
 
-const ExpenseList: React.FC<Props> = ({
-  expenses,
+type Props<T> = {
+  data: T[];
+  columns: Column<T>[];
+
+  loading?: boolean;
+  error?: string | null;
+
+  filters?: {
+    options: string[];
+    selected: string;
+    onChange: (value: string) => void;
+  };
+
+  page?: number;
+  totalPages?: number;
+  setPage?: React.Dispatch<React.SetStateAction<number>>;
+};
+
+function ExpenseList<T extends { _id: string }>({
+  data,
+  columns,
   loading,
   error,
-  onEdit,
+  filters,
   page,
   totalPages,
   setPage,
-  onDelete,
-  selectedStatus,
-  setSelectedStatus,
-}) => {
-  const statusButtons = ["PENDING", "APPROVED", "REJECTED"];
-
+}: Props<T>) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
 
-      {/* STATUS FILTER BUTTONS */}
-      <div className="flex gap-3 mb-4">
-        {statusButtons.map((status) => (
-          <button
-            key={status}
-            onClick={() => {
-              setSelectedStatus(status as any);
-              setPage(1);
-            }}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${selectedStatus === status
-              ? "bg-blue-600 text-white"
-              : "bg-gray-200 text-black hover:bg-gray-300"
-              }`}
-          >
-            {status}
-          </button>
-        ))}
-      </div>
+      {/* FILTERS */}
+     {filters && (
+  <div className="flex items-center gap-3 mb-4">
+    <label className="text-sm font-medium text-gray-600">
+      Filter:
+    </label>
+
+    <select
+      value={filters.selected}
+      onChange={(e) => {
+        filters.onChange(e.target.value);
+        setPage?.(1);
+      }}
+      className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      {filters.options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
 
       {/* TABLE */}
       {loading ? (
         <div className="p-6">Loading...</div>
       ) : error ? (
         <div className="p-6 text-red-600">{error}</div>
-      ) : expenses.length === 0 ? (
-        <div className="p-6 text-gray-500">No expenses found</div>
+      ) : data.length === 0 ? (
+        <div className="p-6 text-gray-500">No data found</div>
       ) : (
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 uppercase text-xs text-gray-600">
             <tr>
-              <th className="px-4 py-3 text-left">Title</th>
-              <th className="px-4 py-3 text-left">Amount</th>
-              <th className="px-4 py-3 text-left">Date</th>
-              <th className="px-4 py-3 text-left">tags</th>
-              <th className="px-4 py-3 text-center">Status</th>
-              <th className="px-4 py-3 text-center">Receipt</th>
-
-              <th className="px-4 py-3 text-center">Actions</th>
+              {columns.map((col) => (
+                <th key={col.header} className="px-4 py-3 text-left">
+                  {col.header}
+                </th>
+              ))}
             </tr>
           </thead>
 
           <tbody>
-            {expenses.map((exp) => (
-              <tr key={exp._id} className="border-t">
-                <td className="px-4 py-3">{exp.title}</td>
-              <td>
-  {new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: exp.currency,
-  }).format(
-    Number(
-      (exp.originalAmount as any)?.$numberDecimal ??
-        exp.originalAmount
-    )
-  )}
-</td>
-                <td className="px-4 py-3">
-                  {new Date(exp.expenseDate).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-center">{exp.tags}</td>
-                <td className="px-4 py-3 text-center">{exp.status}</td>
-                <td className="px-4 py-3 text-center"><p>
-                  {exp.receipt ? (
-                    <button
-                      onClick={() => window.open(exp.receipt, "_blank")}
-                      className="text-blue-600 font-medium hover:underline cursor-pointer"
-                    >
-                      View Receipt
-                    </button>
-                  ) : (
-                    <span className="text-gray-400">No Receipt</span>
-                  )}
-                </p></td>
-                <td className="px-4 py-3 text-center">
-                  {exp.status === "PENDING" ? (
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => onEdit(exp)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => onDelete(exp._id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 text-xs">
-
-                      <button
-                        onClick={() => onDelete(exp._id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition"
-                      >
-                        Delete
-                      </button>
-                    </span>
-                  )}
-                </td>
+            {data.map((row) => (
+              <tr key={row._id} className="border-t">
+                {columns.map((col) => (
+                  <td key={col.header} className="px-4 py-3">
+                    {col.render
+                      ? col.render(row)
+                      : (row as any)[col.accessor]}
+                  </td>
+                ))}
               </tr>
             ))}
-
           </tbody>
         </table>
       )}
 
       {/* PAGINATION */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          disabled={page === 1}
-          onClick={() => setPage((prev) => prev - 1)}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-40"
-        >
-          Prev
-        </button>
+      {page && totalPages && setPage && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((prev) => prev - 1)}
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-40"
+          >
+            Prev
+          </button>
 
-        <span>
-          Page {page} of {totalPages}
-        </span>
+          <span>
+            Page {page} of {totalPages}
+          </span>
 
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage((prev) => prev + 1)}
-          className="px-4 py-2 bg-gray-200 rounded disabled:opacity-40"
-        >
-          Next
-        </button>
-      </div>
+          <button
+            disabled={page === totalPages}
+            onClick={() => setPage((prev) => prev + 1)}
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
-};
+}
 
 export default ExpenseList;

@@ -25,8 +25,9 @@ const items: Item[] = [
   { id: "expenses", label: "Expenses", href: "/admin/expenses", icon: <ShoppingBag className="h-5 w-5" /> },
   { id: "users", label: "Users", href: "/admin/users", icon: <Clock3 className="h-5 w-5" /> },
   { id: "department", label: "Department", href: "/admin/departments", icon: <ShoppingBag className="h-5 w-5" /> },
+  { id: "expenseReports", label: "Expense Reports", href: "/admin/expenseReports", icon: <ShoppingBag className="h-5 w-5" /> },
   { id: "purchaseRequests", label: "Purchase Requests", href: "/admin/purchaseRequests", icon: <ShoppingBag className="h-5 w-5" /> },
-  { id: "report", label: "Report", href: "/admin/report", icon: <ShoppingBag className="h-5 w-5" /> },
+  { id: "report", label: "Analytics", href: "/admin/report", icon: <ShoppingBag className="h-5 w-5" /> },
 ];
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {

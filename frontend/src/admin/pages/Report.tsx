@@ -23,6 +23,10 @@ export default function ReportPage() {
   const [deptTotalPages, setDeptTotalPages] = useState(1);
 const [userTotalPages, setUserTotalPages] = useState(1);
 
+const [email, setEmail] = useState("")
+const [mailLoading, setMailLoading] = useState(false)
+const [mailMessage, setMailMessage] = useState("")
+
   const token = localStorage.getItem("token");
 
   // 2. Updated Generate Report Logic
@@ -77,6 +81,59 @@ const [userTotalPages, setUserTotalPages] = useState(1);
     };
     fetchOverall();
   }, [dates, generated, token]);
+
+
+  //MAIL REPORT
+const sendReportEmail = async () => {
+
+  if (!email) {
+    alert("Please enter email")
+    return
+  }
+
+  if (!dates) {
+    alert("Generate report first")
+    return
+  }
+
+  try {
+
+    setMailLoading(true)
+    setMailMessage("Scheduling report generation...")
+
+    await axios.get(
+      "http://localhost:8000/api/expenses/generate-report",
+      {
+        headers: { token },
+        params: {
+          fromDate: dates.startDate,
+          toDate: dates.endDate,
+          email
+        }
+      }
+    )
+
+    setMailMessage("Report generation started. You will receive the Excel report shortly.")
+        setEmail("")
+        
+  } catch (err) {
+
+    console.error(err)
+
+    setMailMessage("Failed to schedule report")
+
+  } finally {
+
+    setMailLoading(false)
+
+    setTimeout(() => {
+      setMailMessage("")
+    }, 5000)
+
+  }
+
+}
+
 
   // DEPARTMENT ANALYTICS 
   useEffect(() => {
@@ -141,39 +198,78 @@ const [userTotalPages, setUserTotalPages] = useState(1);
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen space-y-6">
+    <div className="p-8 bg-gray-50 min-h-screen space-y-6 ">
       
-      {/* FILTER BAR */}
-      <div className="bg-white p-6 rounded-xl shadow flex gap-6 items-center flex-wrap">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase">From Date</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            onKeyDown={(e) => e.preventDefault()}
-            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
+ {/* FILTER BAR */}
+<div className="bg-white p-6 rounded-xl shadow flex justify-between items-end flex-wrap">
 
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase">To Date</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            onKeyDown={(e) => e.preventDefault()}
-            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
+  {/* LEFT SIDE */}
+  <div className="flex gap-6 items-end">
 
-        <button
-          onClick={generateReport}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-medium self-end transition-colors"
-        >
-          {loading ? "Generating..." : "Generate Report"}
-        </button>
-      </div>
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-500 uppercase">
+        From Date
+      </label>
+      <input
+        type="date"
+        value={fromDate}
+        onChange={(e) => setFromDate(e.target.value)}
+        onKeyDown={(e) => e.preventDefault()}
+        className="border px-2 py-1 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none"
+      />
+    </div>
+
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-500 uppercase">
+        To Date
+      </label>
+      <input
+        type="date"
+        value={toDate}
+        onChange={(e) => setToDate(e.target.value)}
+        onKeyDown={(e) => e.preventDefault()}
+        className="border px-2 py-1 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none"
+      />
+    </div>
+
+    <button
+      onClick={generateReport}
+      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 text-sm rounded-lg font-medium"
+    >
+      {loading ? "Generating..." : "Generate Report"}
+    </button>
+
+  </div>
+
+
+  {/* RIGHT SIDE → EMAIL */}
+  {generated && (
+    <div className="flex items-center gap-3">
+
+      <span className="text-sm font-semibold text-gray-600">
+        Enter Mail
+      </span>
+
+      <input
+        type="email"
+        placeholder="email@example.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="border px-2 py-1 text-sm rounded w-52"
+      />
+
+      <button
+        onClick={sendReportEmail}
+        disabled={mailLoading}
+        className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 text-sm rounded-lg"
+      >
+        {mailLoading ? "Scheduling..." : "Send Report"}
+      </button>
+
+    </div>
+  )}
+
+</div>
 
       {/* REPORT SECTION */}
       {generated && (

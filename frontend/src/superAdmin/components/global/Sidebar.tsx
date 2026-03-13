@@ -21,7 +21,8 @@ type SidebarProps = {
 };
 
 const items: Item[] = [
-  { id: "dashboard", label: "Dashboard", href: "/superAdmin/dashboard", icon: <Briefcase className="h-5 w-5" /> },
+  { id: "dashboard", label: "Organizations", href: "/superAdmin/organization", icon: <Briefcase className="h-5 w-5" /> },
+  { id: "dashboard", label: "Add Admins", href: "/superAdmin/admin", icon: <Briefcase className="h-5 w-5" /> },
 ];
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {

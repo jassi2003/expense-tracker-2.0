@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ExpenseList from "../expenses/AllExpenses";
 
 interface Expense {
   _id: string;
@@ -21,108 +22,175 @@ interface Report {
 interface Props {
   reports: Report[];
   expensesByReport: Record<string, Expense[]>;
+
+  columns: any[];
+
+  reportPage: Record<string, number>;
+  reportTotalPages: Record<string, number>;
+  setReportPage: (reportId: string, page: number) => void;
+
+  renderReportActions?: (report: Report) => React.ReactNode;
+  renderReportMeta?: (report: Report) => React.ReactNode;
+  
+reportFilters?: Record<string, string>;
+setReportFilters?: React.Dispatch<
+  React.SetStateAction<Record<string, string>>
+  >;
+
 }
 
-const AllReports: React.FC<Props> = ({ reports, expensesByReport }) => {
+const AllReports: React.FC<Props> = ({
+  reports,
+  expensesByReport,
+  columns,
+  reportPage,
+  reportTotalPages,
+  setReportPage,
+  renderReportActions,
+  renderReportMeta,
+   reportFilters,
+  setReportFilters,
+}) => {
   const [openReport, setOpenReport] = useState<string | null>(null);
 
   return (
-    <div className="space-y-6">
-      {reports.map((report) => {
-        const expenses = expensesByReport[report._id] || [];
+  <div className="space-y-5">
+    {reports.map((report) => {
+      const expenses = expensesByReport[report._id] || [];
 
-        return (
+      const statusStyle =
+        report.status === "DRAFT"
+          ? "bg-gray-100 text-gray-600"
+          : report.status === "SUBMITTED"
+          ? "bg-blue-100 text-blue-700"
+          : report.status === "APPROVED"
+          ? "bg-green-100 text-green-700"
+          : "bg-red-100 text-red-700";
+
+      return (
+        <div
+          key={report._id}
+          className="
+          bg-white
+          border border-gray-200
+          rounded-xl
+          shadow-sm
+          transition-all
+          hover:shadow-md
+          "
+        >
+          {/* HEADER */}
           <div
-            key={report._id}
-            className="bg-white rounded-xl shadow-sm border"
+            onClick={() =>
+              setOpenReport(openReport === report._id ? null : report._id)
+            }
+            className="
+            flex
+            justify-between
+            items-start
+            p-6
+            cursor-pointer
+            hover:bg-gray-50
+            transition
+            "
           >
-            {/* Report Header */}
-            <div
-              onClick={() =>
-                setOpenReport(
-                  openReport === report._id ? null : report._id
-                )
-              }
-              className="flex justify-between items-center p-5 cursor-pointer hover:bg-gray-50"
-            >
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {report.reportName}
-                </h3>
+            {/* LEFT SIDE */}
+            <div className="flex flex-col">
 
-                <p className="text-sm text-gray-500">
-                  {report.purpose}
-                </p>
+              <h3 className="text-lg font-semibold text-gray-800">
+                {report.reportName.toUpperCase()}
+              </h3>
 
-                <p className="text-xs text-gray-400 mt-1">
-                  {new Date(report.date).toLocaleDateString()}
-                </p>
-              </div>
+              <p className="text-sm text-gray-500 mt-1">
+               Purpose: {report.purpose}
+              </p>
 
-              <div className="text-right">
-                <p className="font-semibold text-gray-800">
-                  ₹ {report.totalAmount}
-                </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {new Date(report.date).toLocaleDateString()}
+              </p>
 
-                <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                  {report.status}
-                </span>
-              </div>
+              {/* STATUS BADGE */}
+              <span
+                className={`mt-2 text-xs font-medium px-2.5 py-1 rounded-md w-fit ${statusStyle}`}
+              >
+                {report.status}
+              </span>
+
+              {renderReportMeta && renderReportMeta(report)}
+
             </div>
 
-            {/* Expenses */}
-            {openReport === report._id && (
-              <div className="border-t p-5">
-                {expenses.length === 0 ? (
-                  <div className="text-center text-gray-400 py-6">
-                    No expenses in this report
-                  </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b">
-                        <th className="py-2">Title</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
 
-                    <tbody>
-                      {expenses.map((exp) => (
-                        <tr
-                          key={exp._id}
-                          className="border-b hover:bg-gray-50"
-                        >
-                          <td className="py-3">{exp.title}</td>
+            {/* RIGHT SIDE */}
+            <div className="flex flex-col items-end gap-2">
 
-                          <td>
-                            {exp.currency} {exp.amount}
-                          </td>
+              {/* ACTIONS (delete/submit etc) */}
+              {renderReportActions && (
+                <div className="flex items-center gap-3">
+                  {renderReportActions(report)}
+                </div>
+              )}
 
-                          <td>
-                            {new Date(
-                              exp.expenseDate
-                            ).toLocaleDateString()}
-                          </td>
+              {/* AMOUNT */}
+              <p className="text-lg font-semibold text-gray-800">
+                ₹ {report.totalAmount}
+              </p>
 
-                          <td>
-                            <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
-                              {exp.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
+            </div>
           </div>
-        );
-      })}
-    </div>
-  );
-};
 
+
+          {/* EXPENSES */}
+          {openReport === report._id && (
+            <div
+              className="
+              border-t
+              bg-gray-50
+              p-6
+              "
+            >
+              <ExpenseList
+                data={expenses}
+                columns={columns}
+
+                filters={
+                  reportFilters && setReportFilters
+                    ? {
+                        options: [
+                          "PENDING",
+                          "APPROVED",
+                          "REJECTED",
+                          "FLAGGED",
+                          "ALL",
+                        ],
+                        selected: reportFilters[report._id] || "PENDING",
+                        onChange: (value) =>
+                          setReportFilters((prev) => ({
+                            ...prev,
+                            [report._id]: value,
+                          })),
+                      }
+                    : undefined
+                }
+
+                page={reportPage[report._id] || 1}
+                totalPages={reportTotalPages[report._id] || 1}
+
+                setPage={(update) => {
+                  const newPage =
+                    typeof update === "function"
+                      ? update(reportPage[report._id] || 1)
+                      : update;
+
+                  setReportPage(report._id, newPage);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
+}
 export default AllReports;

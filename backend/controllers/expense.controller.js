@@ -126,6 +126,8 @@ export const addExpense = asyncHandler(async (req, res) => {
     }
   }
 
+  const status = reportId ? "DRAFT" : "PENDING";
+
   const created = await expenseModel.create({
     title: title.trim(),
     amount: Number(inrAmount.toFixed(2)),
@@ -134,6 +136,7 @@ export const addExpense = asyncHandler(async (req, res) => {
     expenseDate: new Date(expenseDate),
     tags: parsedTags,
     receipt: receiptUrl,
+      status,
     exchangeRate: Number(rate),
     reportId: reportId || null,
         organizationId,
@@ -332,8 +335,8 @@ export const updateExpense = asyncHandler(async (req, res) => {
   }
 
   // Only allow update if pending
-  if (expense.status !== "PENDING") {
-    throw new ApiError(400, "Only pending expenses can be updated");
+  if (expense.status !== "PENDING" && expense.status !=="FLAGGED") {
+    throw new ApiError(400, "cannot update this expense");
   }
 
   // Authorization
@@ -434,7 +437,36 @@ export const updateExpense = asyncHandler(async (req, res) => {
     expense.receipt = uploadResult.secure_url;
   }
 
+  if (expense.status === "FLAGGED") {
+  expense.status = "PENDING";
+  expense.flagReason = undefined;
+}
+
   await expense.save();
+
+// Recalculate report status based on expenses
+const reportExpenses = await expenseModel.find({
+  reportId: expense.reportId
+});
+
+const statuses = reportExpenses.map(e => e.status);
+
+let reportStatus = "SUBMITTED";
+
+if (statuses.includes("FLAGGED")) {
+  reportStatus = "FLAGGED";
+}
+else if (statuses.every(s => s === "APPROVED")) {
+  reportStatus = "APPROVED";
+}
+else if (statuses.every(s => s === "REJECTED")) {
+  reportStatus = "REJECTED";
+}
+
+await expenseReportModel.findByIdAndUpdate(
+  expense.reportId,
+  { status: reportStatus }
+);
 
   return res.status(200).json({
     success: true,
@@ -665,6 +697,52 @@ export const rejectExpense = asyncHandler(async (req, res) => {
   return res.status(200).json({
     success: true,
     message: "Expense rejected successfully",
+    title: expense.title,
+    userId: expense.raisedBy.userId,
+    department: expense.raisedBy.dept,
+    status: expense.status,
+    amount: expense.amount,
+  });
+});
+
+//FLAG EXEPENSE
+export const flagExpense = asyncHandler(async (req, res) => {
+  if (req.user?.role !== "ADMIN") {
+    throw new ApiError(403, "Access denied");
+  }
+
+  const { expId } = req.params;
+
+  const organizationId = req.user?.organizationId;
+  if (!organizationId) {
+    throw new ApiError(401, "Organization not found in token");
+  }
+
+
+  const expense = await expenseModel.findOne({
+    _id: expId,
+    organizationId
+  });
+
+  if (!expense) {
+    throw new ApiError(404, "Expense not found");
+  }
+
+  if (expense.status === "FLAGGED" || expense.status==="REJECTED") {
+    throw new ApiError(400, "Expense already rejected OR flagged");
+  }
+
+  if (expense.status === "APPROVED") {
+    throw new ApiError(400, "Approved expense cannot be flagged");
+  }
+
+  expense.status = "FLAGGED";
+
+  await expense.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Expense flagged successfully",
     title: expense.title,
     userId: expense.raisedBy.userId,
     department: expense.raisedBy.dept,
