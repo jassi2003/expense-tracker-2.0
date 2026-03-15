@@ -25,28 +25,28 @@ export const addExpense = asyncHandler(async (req, res) => {
   if (!organizationId) {
     throw new ApiError(401, "Organization not found in token");
   }
-  
+
   //validating expenseReport
   let report = null;
-   if (reportId) {
-  if (!mongoose.Types.ObjectId.isValid(reportId)) {
-    throw new ApiError(400, "Invalid report id");
-  }
+  if (reportId) {
+    if (!mongoose.Types.ObjectId.isValid(reportId)) {
+      throw new ApiError(400, "Invalid report id");
+    }
 
-  report = await expenseReportModel.findOne({
-    _id: new mongoose.Types.ObjectId(reportId),
-    employeeId: req.user.userId,
-    organizationId
-  });
+    report = await expenseReportModel.findOne({
+      _id: new mongoose.Types.ObjectId(reportId),
+      employeeId: req.user.userId,
+      organizationId
+    });
 
-  if (!report) {
-    throw new ApiError(404, "Report not found");
-  }
+    if (!report) {
+      throw new ApiError(404, "Report not found");
+    }
 
-  if (report.status !== "DRAFT") {
-    throw new ApiError(400, "Cannot add expenses to submitted report");
+    if (report.status !== "DRAFT") {
+      throw new ApiError(400, "Cannot add expenses to the  report");
+    }
   }
-}
 
 
 
@@ -70,8 +70,8 @@ export const addExpense = asyncHandler(async (req, res) => {
   const department = await departmentModel.findOne({
     departmentName: { $regex: `^${req.user.dept}$`, $options: "i" },
     organizationId
-
   });
+
 
   if (!department) {
     throw new ApiError(404, "Department not found");
@@ -136,10 +136,10 @@ export const addExpense = asyncHandler(async (req, res) => {
     expenseDate: new Date(expenseDate),
     tags: parsedTags,
     receipt: receiptUrl,
-      status,
+    status,
     exchangeRate: Number(rate),
     reportId: reportId || null,
-        organizationId,
+    organizationId,
     raisedBy: {
       userId: req.user.userId,
       dept: req.user.dept,
@@ -154,13 +154,15 @@ export const addExpense = asyncHandler(async (req, res) => {
 
   if (reportId) {
 
-    await expenseReportModel.findByIdAndUpdate(
-      reportId,
-              organizationId,
-      {
-        $inc: { totalAmount: created.amount }
-      }
-    );
+    await expenseReportModel.findOneAndUpdate(
+  {
+    _id: reportId,
+    organizationId
+  },
+  {
+    $inc: { totalAmount: created.amount }
+  }
+);
 
   }
 
@@ -172,14 +174,51 @@ export const addExpense = asyncHandler(async (req, res) => {
 });
 
 
+//SUBMIT THE DRAFT EXPENSE
+export const submitDraftExpense = asyncHandler(async (req, res) => {
+
+  const { expenseId } = req.params;
+  const organizationId = req.user?.organizationId;
+
+  if (!mongoose.Types.ObjectId.isValid(expenseId)) {
+    throw new ApiError(400, "Invalid expense id");
+  }
+
+  const expense = await expenseModel.findOne({
+    _id: expenseId,
+    "raisedBy.userId": req.user?.userId,
+    organizationId
+  });
+
+  if (!expense) {
+    throw new ApiError(404, "Expense not found");
+  }
+
+  if (expense.status !== "DRAFT") {
+    throw new ApiError(400, "Only draft expenses can be submitted");
+  }
+
+  expense.status = "PENDING";
+
+  await expense.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Expense submitted successfully",
+    expense
+  });
+
+});
+
+
 
 //SCANNING RECEIPT 
 export const scanReceiptController = async (req, res) => {
   try {
-  const organizationId = req.user?.organizationId;
-  if (!organizationId) {
-    throw new ApiError(401, "Organization not found in token");
-  }
+    const organizationId = req.user?.organizationId;
+    if (!organizationId) {
+      throw new ApiError(401, "Organization not found in token");
+    }
 
     const file = req.file;
 
@@ -264,13 +303,9 @@ export const getMyExpenses = asyncHandler(async (req, res) => {
     filter.status = req.query.status;
   }
 
-  console.log("getMyExpenses filter:", filter, "page:", page, "limit:", limit);
 
-  // Count total expenses
-  const totalExpenses = await expenseModel.countDocuments({
-    "raisedBy.userId": userId,
-    organizationId
-  });
+  // Count total expenses using the same filter as the fetched rows
+  const totalExpenses = await expenseModel.countDocuments(filter);
 
   if (totalExpenses === 0) {
     return res.status(200).json({
@@ -335,7 +370,7 @@ export const updateExpense = asyncHandler(async (req, res) => {
   }
 
   // Only allow update if pending
-  if (expense.status !== "PENDING" && expense.status !=="FLAGGED") {
+  if (expense.status !== "PENDING" && expense.status !== "FLAGGED") {
     throw new ApiError(400, "cannot update this expense");
   }
 
@@ -438,35 +473,35 @@ export const updateExpense = asyncHandler(async (req, res) => {
   }
 
   if (expense.status === "FLAGGED") {
-  expense.status = "PENDING";
-  expense.flagReason = undefined;
-}
+    expense.status = "PENDING";
+    expense.flagReason = undefined;
+  }
 
   await expense.save();
 
-// Recalculate report status based on expenses
-const reportExpenses = await expenseModel.find({
-  reportId: expense.reportId
-});
+  // Recalculate report status based on expenses
+  const reportExpenses = await expenseModel.find({
+    reportId: expense.reportId
+  });
 
-const statuses = reportExpenses.map(e => e.status);
+  const statuses = reportExpenses.map(e => e.status);
 
-let reportStatus = "SUBMITTED";
+  let reportStatus = "SUBMITTED";
 
-if (statuses.includes("FLAGGED")) {
-  reportStatus = "FLAGGED";
-}
-else if (statuses.every(s => s === "APPROVED")) {
-  reportStatus = "APPROVED";
-}
-else if (statuses.every(s => s === "REJECTED")) {
-  reportStatus = "REJECTED";
-}
+  if (statuses.includes("FLAGGED")) {
+    reportStatus = "FLAGGED";
+  }
+  else if (statuses.every(s => s === "APPROVED")) {
+    reportStatus = "APPROVED";
+  }
+  else if (statuses.every(s => s === "REJECTED")) {
+    reportStatus = "REJECTED";
+  }
 
-await expenseReportModel.findByIdAndUpdate(
-  expense.reportId,
-  { status: reportStatus }
-);
+  await expenseReportModel.findByIdAndUpdate(
+    expense.reportId,
+    { status: reportStatus }
+  );
 
   return res.status(200).json({
     success: true,
@@ -728,7 +763,7 @@ export const flagExpense = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Expense not found");
   }
 
-  if (expense.status === "FLAGGED" || expense.status==="REJECTED") {
+  if (expense.status === "FLAGGED" || expense.status === "REJECTED") {
     throw new ApiError(400, "Expense already rejected OR flagged");
   }
 
@@ -753,19 +788,93 @@ export const flagExpense = asyncHandler(async (req, res) => {
 
 
 
+//SUBMIT THE FLAG EXPENSE
+export const submitFlaggedExpense = asyncHandler(async (req, res) => {
+  const { expenseId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(expenseId)) {
+    throw new ApiError(400, "Invalid expense id");
+  }
+
+  const employeeId = req.user.userId;
+  const organizationId = req.user.organizationId;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+
+    // Update flagged expense → pending
+    const expense = await expenseModel.findOneAndUpdate(
+      {
+        _id: expenseId,
+        "raisedBy.userId": employeeId,
+        organizationId,
+        status: "FLAGGED"
+      },
+      {
+        $set: {
+          status: "PENDING",
+          flagReason: null
+        }
+      },
+      { new: true, session }
+    );
+
+    if (!expense) {
+      throw new ApiError(404, "Flagged expense not found");
+    }
+
+    let report = null;
+
+    // Optional report update
+    if (expense.reportId) {
+      report = await expenseReportModel.findOneAndUpdate(
+        {
+          _id: expense.reportId,
+          employeeId,
+          organizationId
+        },
+        {
+          $set: { status: "SUBMITTED" }
+        },
+        { new: true, session }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: "Expense resubmitted successfully",
+      expense,
+      report
+    });
+
+  } catch (error) {
+
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+
+  }
+});
+
+
+
 // REPORT GENERATION FOR DASHBOARD
 // //overall monthly stats
 export const getOverallAnalytics = asyncHandler(async (req, res) => {
   const { fromDate, toDate } = req.query;
 
- const organizationId = req.user?.organizationId;
+  const organizationId = req.user?.organizationId;
 
   if (!organizationId) {
     throw new ApiError(401, "Organization not found in token");
   }
 
 
-  const data = await getOverallAnalyticsService({ fromDate, toDate,organizationId })
+  const data = await getOverallAnalyticsService({ fromDate, toDate, organizationId })
 
   res.json({
     success: true,
@@ -815,7 +924,7 @@ export const getUserAnalytics = asyncHandler(async (req, res) => {
   const result = await getUserAnalyticsService({
     fromDate,
     toDate,
-        organizationId,
+    organizationId,
     dept,
     page: Number(page),
     limit: Number(limit),
@@ -969,17 +1078,17 @@ export const getAdminDashboardStats = asyncHandler(async (req, res) => {
     },
     topDepartment: topDepartment
       ? {
-          department: topDepartment._id,
-          total: topDepartment.total,
-          count: topDepartment.count
-        }
+        department: topDepartment._id,
+        total: topDepartment.total,
+        count: topDepartment.count
+      }
       : null,
     topEmployee: topEmployee
       ? {
-          userId: topEmployee._id,
-          total: topEmployee.total,
-          count: topEmployee.count
-        }
+        userId: topEmployee._id,
+        total: topEmployee.total,
+        count: topEmployee.count
+      }
       : null,
     generatedAt: new Date()
   });
@@ -1025,8 +1134,8 @@ export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
   ]);
 
   const months = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec"
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   ];
 
   const map = new Map(result.map((r) => [r._id, r]));

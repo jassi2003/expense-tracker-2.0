@@ -10,9 +10,6 @@ const raisedBySchema = new mongoose.Schema(
   { _id: false }
 );
 
-
-
-
 const reportSchema = new mongoose.Schema(
   {
     employeeId: {
@@ -54,5 +51,9 @@ const reportSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+reportSchema.index({ employeeId: 1, organizationId: 1 });
+reportSchema.index({ organizationId: 1, status: 1 });
+
 
 export default mongoose.model("ReportData", reportSchema);

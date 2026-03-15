@@ -21,6 +21,8 @@ interface Expense {
   currency: string
   expenseDate: string
   status: string
+  originalAmount: number
+  tags: string[]
 }
 
 const ExpenseReports = () => {
@@ -170,11 +172,13 @@ const ExpenseReports = () => {
 
     {
       header: "Amount",
+      accessor: "",
       render: (exp: Expense) => `${exp.currency} ${exp.amount}`
     },
 
     {
       header: "Date",
+      accessor: "",
       render: (exp: Expense) =>
         new Date(exp.expenseDate).toLocaleDateString()
     },
@@ -183,6 +187,7 @@ const ExpenseReports = () => {
 
     {
       header: "Actions",
+      accessor: "",
       render: (exp: Expense) => (
         <div className="flex gap-2">
 

@@ -16,7 +16,9 @@ import {
     getOverallAnalytics,
     generateReportController,
     scanReceiptController,
-    flagExpense
+    flagExpense,
+    submitDraftExpense,
+    submitFlaggedExpense
 } from "../controllers/expense.controller.js"
 import authUser from "../middlewares/authUser.js"
 import upload from "../middlewares/multer.js"
@@ -31,6 +33,8 @@ expenseRoutes.get("/expense-summary", authUser, getExpenseSummary);
 expenseRoutes.put("/approve-expense/:expId", authUser, approveExpense);
 expenseRoutes.put("/reject-expense/:expId", authUser, rejectExpense)
 expenseRoutes.put("/flag-expense/:expId", authUser, flagExpense)
+expenseRoutes.put("/submit-draftExpense/:expenseId", authUser,submitDraftExpense)
+expenseRoutes.put("/submit-flagged-expense/:expenseId", authUser, submitFlaggedExpense);
 
 expenseRoutes.get("/admin-dashboard-stats", authUser, getAdminDashboardStats)
 expenseRoutes.get("/report-overall", authUser, getOverallAnalytics)

@@ -1,14 +1,16 @@
 import React, { useState } from "react";
+import type { Expense } from "../../pages/ExpenseReport";
 
-interface Expense {
-  _id: string;
-  title: string;
-  // amount: number;
-  originalAmount: number;
-  currency: string;
-  expenseDate: string;
-  tags: string[];
-}
+
+// interface Expense {
+//   _id: string;
+//   title: string;
+//   // amount: number;
+//   originalAmount: number;
+//   currency: string;
+//   expenseDate: string;
+//   tags: string[];
+// }
 
 interface Props {
   expense: Expense;

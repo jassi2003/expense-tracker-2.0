@@ -52,21 +52,21 @@ const RaisePurchase: React.FC<Props> = ({
 
         <form onSubmit={submit} className="space-y-3">
 
-          <input name="title" value={form.title} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input name="title" value={form.title} placeholder="enter title" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input name="category" value={form.category} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input name="category" value={form.category}  placeholder="enter category" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input name="description" value={form.description} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input name="description" value={form.description} placeholder="enter description" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input type="number" name="quantity" value={form.quantity} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input type="number" name="quantity" value={form.quantity} placeholder="enter quantity" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input type="number" name="estimatedCost" value={form.estimatedCost} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input type="number" name="estimatedCost" value={form.estimatedCost} placeholder="estimated cost" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input name="currency" value={form.currency} onChange={handleChange} className="w-full border p-2 rounded" />
+          {/* <input name="currency" value={form.currency} onChange={handleChange} placeholder="" className="w-full border p-2 rounded" /> */}
 
-          <input name="productLink" value={form.productLink} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input name="productLink" value={form.productLink} placeholder="product link" onChange={handleChange} className="w-full border p-2 rounded" />
 
-          <input type="date" name="date" value={form.date} onChange={handleChange} className="w-full border p-2 rounded" />
+          <input type="date" name="date" value={form.date} placeholder="enter date" onChange={handleChange} className="w-full border p-2 rounded" />
 
           <button className="w-full bg-blue-600 text-white py-2 rounded">
             {editingRequest ? "Update Request" : "Submit Request"}

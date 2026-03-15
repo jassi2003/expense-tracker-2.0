@@ -169,7 +169,6 @@ export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
 
 });
 
-//ALL EMPLOYEES PURCHAE REQUESTS FOR ADMIN
 // ALL EMPLOYEES PURCHASE REQUESTS FOR ADMIN
 export const getAllPurchaseRequests = asyncHandler(async (req, res) => {
 

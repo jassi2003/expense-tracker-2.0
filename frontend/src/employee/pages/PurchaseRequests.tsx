@@ -193,7 +193,6 @@ const PurchaseRequests: React.FC = () => {
       <div className="flex justify-between mb-6 items-center">
 
         <h1 className="text-2xl font-semibold">
-          Purchase Requests
         </h1>
 
         <button

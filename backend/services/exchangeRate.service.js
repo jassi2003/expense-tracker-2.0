@@ -29,9 +29,3 @@ export const updateExchangeRates = async () => {
   }
 };
 
-// export const startExchangeCron = () => {
-//   // Every 1 hour
-//   cron.schedule("0 * * * *", updateExchangeRates);
-//     console.log("Exchange rate cron started");
-// };
-

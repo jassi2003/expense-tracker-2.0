@@ -116,9 +116,7 @@ const fetchAllExpenses = async (): Promise<void> => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-2xl font-bold text-black mb-6">
-        Admin Expense Dashboard
-      </h1>
+    
 
       <AllExpenses
         expenses={expenses}

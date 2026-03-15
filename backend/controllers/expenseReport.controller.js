@@ -3,20 +3,18 @@ import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
 import expenseModel from "../models/expense.model.js";
 import ApiError from "../utils/ApiError.js";
+import departmentModel from "../models/department.model.js";
 
 //CREATE EXPENSE REPORT 
 export const createReport = asyncHandler(async (req, res) => {
 
   try {
-
     const { reportName, purpose, date } = req.body;
     const organizationId = req.user?.organizationId;
 
     if (!organizationId) {
       throw new ApiError(401, "Organization not found in token");
     }
-
-
     const report = await expenseReportModel.create({
       employeeId: req.user.userId,
       reportName,
@@ -49,15 +47,27 @@ export const createReport = asyncHandler(async (req, res) => {
 export const getMyReports = asyncHandler(async (req, res) => {
   try {
     const organizationId = req.user?.organizationId;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 5, 1);
+    const skip = (page - 1) * limit;
 
-    const reports = await expenseReportModel.find({
+    const filter = {
       employeeId: req.user.userId,
       organizationId
-    }).sort({ createdAt: -1 });
+    };
+
+    const [reports, totalReports] = await Promise.all([
+      expenseReportModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      expenseReportModel.countDocuments(filter)
+    ]);
 
     res.json({
       success: true,
-      reports
+      reports,
+      page,
+      limit,
+      totalReports,
+      totalPages: Math.ceil(totalReports / limit)
     });
 
   } catch (error) {
@@ -79,11 +89,8 @@ export const getExpensesByReport = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(reportId)) {
     throw new ApiError(400, "Invalid report id");
   }
-
   const employeeId = req.user.userId;
   const organizationId = req.user?.organizationId;
-
-  // pagination params
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 5;
   const skip = (page - 1) * limit;
@@ -99,14 +106,15 @@ export const getExpensesByReport = asyncHandler(async (req, res) => {
   }
 
   // fetch paginated expenses
-  const expenses = await expenseModel
+const [expenses, totalExpenses] = await Promise.all([
+  expenseModel
     .find({ reportId })
     .sort({ expenseDate: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit),
 
-  // total count
-  const totalExpenses = await expenseModel.countDocuments({ reportId });
+  expenseModel.countDocuments({ reportId })
+]);
 
   return res.status(200).json({
     success: true,
@@ -121,6 +129,7 @@ export const getExpensesByReport = asyncHandler(async (req, res) => {
 });
 
 
+
 //DELETING ONLY "DRAFT" REPORT AND ALL EXPENSES INSIDE IT
 export const deleteDraftReport = asyncHandler(async (req, res) => {
 
@@ -131,19 +140,16 @@ export const deleteDraftReport = asyncHandler(async (req, res) => {
 
   try {
 
-    const report = await expenseReportModel.findById(reportId).session(session);
+    const report = await expenseReportModel.findOneAndDelete(
+      { _id: reportId, status: "DRAFT" },
+      { session }
+    );
 
     if (!report) {
-      throw new ApiError(404, "Report not found");
-    }
-
-    if (report.status !== "DRAFT") {
-      throw new ApiError(400, "Only draft reports can be deleted");
+      throw new ApiError(404, "Report not found or not a draft");
     }
 
     await expenseModel.deleteMany({ reportId }).session(session);
-
-    await expenseReportModel.findByIdAndDelete(reportId).session(session);
 
     await session.commitTransaction();
     session.endSession();
@@ -160,7 +166,10 @@ export const deleteDraftReport = asyncHandler(async (req, res) => {
     throw error;
 
   }
+
 });
+
+
 
 // SUBMIT EXPENSE REPORT and updating the expense status to "pending"
 export const submitReport = asyncHandler(async (req, res) => {
@@ -220,64 +229,134 @@ export const reviewExpense = asyncHandler(async (req, res) => {
   const { expenseId } = req.params;
   const { action, reason } = req.body;
 
+  const organizationId = req.user?.organizationId;
+
   if (!mongoose.Types.ObjectId.isValid(expenseId)) {
     throw new ApiError(400, "Invalid expense id");
   }
+
   const allowedActions = ["APPROVED", "REJECTED", "FLAGGED"];
 
   if (!allowedActions.includes(action)) {
     throw new ApiError(400, "Invalid action");
   }
 
-  const expense = await expenseModel.findById(expenseId);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!expense) {
-    throw new ApiError(404, "Expense not found");
+  try {
+    const expense = await expenseModel.findOne({
+      _id: expenseId,
+      organizationId
+    }).session(session);
+
+    if (!expense) {
+      throw new ApiError(404, "Expense not found");
+    }
+
+    if (expense.status !== "PENDING") {
+      throw new ApiError(400, "Only PENDING expenses can be reviewed");
+    }
+
+    let departmentBudget = null;
+
+    //APPROVE EXPENSE
+    if (action === "APPROVED") {
+
+      const deptKey = (expense.raisedBy?.dept || "").trim().toUpperCase();
+      const amount = Number(expense.amount);
+
+      if (!deptKey) {
+        throw new ApiError(400, "Department missing in expense");
+      }
+
+      const updatedDept = await departmentModel.findOneAndUpdate(
+        {
+          departmentName: deptKey,
+          organizationId,
+          $expr: {
+            $gte: ["$totalBudget", { $add: ["$consumedBudget", amount] }]
+          }
+        },
+        { $inc: { consumedBudget: amount } },
+        { new: true, session }
+      );
+
+      if (!updatedDept) {
+        throw new ApiError(
+          400,
+          "Not enough department budget to approve this expense"
+        );
+      }
+
+      departmentBudget = {
+        departmentName: updatedDept.departmentName,
+        totalBudget: updatedDept.totalBudget,
+        consumedBudget: updatedDept.consumedBudget,
+        remainingBudget:
+          updatedDept.totalBudget - updatedDept.consumedBudget,
+      };
+
+      expense.approvedAt = new Date();
+      expense.approvedBy = req.user.userId;
+    }
+
+    //FLAGGED
+    if (action === "FLAGGED") {
+      expense.flagReason = reason || "Requires correction";
+    }
+
+    expense.status = action;
+
+    await expense.save({ session });
+
+    //UPDATE REPORT STATUS
+    let reportStatus = "SUBMITTED";
+
+    if (expense.reportId) {
+
+      const reportExpenses = await expenseModel.find(
+        { reportId: expense.reportId },
+        { status: 1 }
+      ).session(session);
+
+      const statuses = reportExpenses.map(e => e.status);
+
+      if (statuses.every(s => s === "APPROVED")) {
+        reportStatus = "APPROVED";
+      } else if (statuses.every(s => s === "REJECTED")) {
+        reportStatus = "REJECTED";
+      } else if (statuses.includes("FLAGGED")) {
+        reportStatus = "FLAGGED";
+      }
+
+      await expenseReportModel.findByIdAndUpdate(
+        expense.reportId,
+        { status: reportStatus },
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: `Expense ${action.toLowerCase()} successfully`,
+      expenseStatus: expense.status,
+      reportStatus,
+      departmentBudget
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  if (expense.status !== "PENDING") {
-    throw new ApiError(400, "Only PENDING expenses can be reviewed");
-  }
-
-  expense.status = action;
-
-  if (action === "FLAGGED") {
-    expense.flagReason = reason || "Requires correction";
-  }
-
-  await expense.save();
-
-  // Update report status automatically
-  const reportExpenses = await expenseModel.find({
-    reportId: expense.reportId
-  });
-
-  const statuses = reportExpenses.map(e => e.status);
-
-  let reportStatus = "SUBMITTED";
-
-  if (statuses.every(s => s === "APPROVED")) {
-    reportStatus = "APPROVED";
-  }
-
-  if (statuses.every(s => s === "REJECTED")) {
-    reportStatus = "REJECTED";
-  }
-
-  if (statuses.includes("FLAGGED")) {
-    reportStatus = "FLAGGED";
-  }
-
-  await expenseReportModel.findByIdAndUpdate(
-    expense.reportId,
-    { status: reportStatus }
-  );
-
-  res.status(200).json({
-    success: true,
-    message: `Expense ${action.toLowerCase()} successfully`
-  });
 });
+
+
+
 
 
 // GET ALL REPORTS FOR ADMIN (WITH PAGINATION)
@@ -298,7 +377,7 @@ export const getAllReports = asyncHandler(async (req, res) => {
     .find({ 
       organizationId,    
   status: { $in: ["SUBMITTED", "APPROVED", "REJECTED", "FLAGGED"] }
- }) // important for multi-tenant
+ }) // for multi-tenant
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
@@ -352,7 +431,8 @@ if (status && status !== "ALL") {
 }
 
 
-  const expenses = await expenseModel
+  const [expenses, totalExpenses] = await Promise.all([
+  expenseModel
     .find({
       ...filter,
       organizationId
@@ -360,12 +440,14 @@ if (status && status !== "ALL") {
     .sort({ expenseDate: -1 })
     .skip(skip)
     .limit(limit)
-    .lean();
+    .lean(),
 
-  const totalExpenses = await expenseModel.countDocuments({
+  expenseModel.countDocuments({
     reportId,
     organizationId
-  });
+  })
+]);
+
 
   res.status(200).json({
     success: true,
@@ -375,5 +457,4 @@ if (status && status !== "ALL") {
     totalPages: Math.ceil(totalExpenses / limit),
     expenses
   });
-
 });

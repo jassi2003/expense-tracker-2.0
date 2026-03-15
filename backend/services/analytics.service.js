@@ -161,11 +161,6 @@ departmentUtilization: {
   };
 };
 
-
-
-
-
-
  //user analytics
 export const getUserAnalyticsService = async ({
   fromDate,

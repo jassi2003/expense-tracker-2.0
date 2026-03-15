@@ -5,7 +5,7 @@ import CreateExpenseForm from "@/employee/components/expenses/ExpenseForm";
 import ExpenseList from "@/employee/components/expenses/AllExpenses";
 import EditExpenseModal from "@/employee/components/expenses/EditExpenseModal";
 
-type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED" | "DRAFT";
+type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED" | "DRAFT" | "FLAGGED";
 
 export interface Expense {
   _id: string;
@@ -16,6 +16,7 @@ export interface Expense {
   expenseDate: string;
   receipt: string;
   status: ExpenseStatus;
+  flagReason?: string;
   tags: string[];
   raisedBy: {
     userId: string;
@@ -140,6 +141,54 @@ const scanReceipt = async (file: File) => {
     }
   };
 
+  const handleSubmitDraftExpense = async (expenseId: string) => {
+    const confirmSubmit = window.confirm(
+      "Submit this draft expense for approval?"
+    );
+
+    if (!confirmSubmit) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      await axios.put(
+        `http://localhost:8000/api/expenses/submit-draftExpense/${expenseId}`,
+        {},
+        {
+          headers: { token },
+        }
+      );
+
+      await fetchExpenses();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to submit draft expense");
+    }
+  };
+
+  const handleSubmitFlaggedExpense = async (expenseId: string) => {
+    const confirmSubmit = window.confirm(
+      "Resubmit this flagged expense for approval?"
+    );
+
+    if (!confirmSubmit) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      await axios.put(
+        `http://localhost:8000/api/expenses/submit-flagged-expense/${expenseId}`,
+        {},
+        {
+          headers: { token },
+        }
+      );
+
+      await fetchExpenses();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to resubmit flagged expense");
+    }
+  };
+
 
 
   useEffect(() => {
@@ -181,6 +230,17 @@ const columns = [
   {
     header: "Status",
     accessor: "status",
+    render: (exp: Expense) =>
+      exp.status === "FLAGGED" ? (
+        <div className="space-y-1">
+          <div className="font-medium text-amber-700">{exp.status}</div>
+          <div className="max-w-[220px] text-xs leading-5 text-slate-500">
+            Reason: {exp.flagReason || "Requires correction"}
+          </div>
+        </div>
+      ) : (
+        exp.status
+      ),
   },
   {
     header: "Receipt",
@@ -201,7 +261,7 @@ const columns = [
     header: "Actions",
     accessor: "actions",
     render: (exp: Expense) =>
-      exp.status === "PENDING"  ? (
+      exp.status === "FLAGGED" || exp.status === "DRAFT"  ? (
         <div className="flex gap-2 justify-center">
           <button
             onClick={() => setEditingExpense(exp)}
@@ -209,6 +269,24 @@ const columns = [
           >
             Edit
           </button>
+
+          {exp.status === "DRAFT" && (
+            <button
+              onClick={() => handleSubmitDraftExpense(exp._id)}
+              className="px-3 py-1 bg-green-600 text-white rounded text-xs"
+            >
+              Submit
+            </button>
+          )}
+
+          {exp.status === "FLAGGED" && (
+            <button
+              onClick={() => handleSubmitFlaggedExpense(exp._id)}
+              className="px-3 py-1 bg-green-600 text-white rounded text-xs"
+            >
+              Submit
+            </button>
+          )}
 
           <button
             onClick={() => handleDeleteExpense(exp._id)}
@@ -248,11 +326,12 @@ const columns = [
   columns={columns}
   loading={loading}
   error={error}
+  showHeader
   page={page}
   totalPages={totalPages}
   setPage={setPage}
   filters={{
-    options: ["DRAFT","PENDING", "APPROVED", "REJECTED"],
+    options: ["DRAFT", "PENDING", "APPROVED", "REJECTED", "FLAGGED"],
     selected: selectedStatus,
     onChange: (status) => setSelectedStatus(status as ExpenseStatus),
   }}

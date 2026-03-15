@@ -48,8 +48,8 @@ const PurchaseRequests: React.FC = () => {
 
       const data = await res.json();
 
-      setRequests(data.requests);
-      setTotalPages(data.totalRequests);
+      setRequests(data.requests || []);
+      setTotalPages(data.totalPages || 1);
 
     } catch (error) {
       console.log(error);

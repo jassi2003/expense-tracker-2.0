@@ -2,22 +2,8 @@ import React, { useEffect, useState } from "react";
 import AllReports from "../components/expenseReport/AllReports";
 import AddReport from "../components/expenseReport/AddReport";
 import EditExpenseModal from "../components/expenses/EditExpenseModal";
-import { Trash2 } from "lucide-react";
 
-const getStatusStyle = (status: string) => {
-  switch (status) {
-    case "DRAFT":
-      return "bg-gray-100 text-gray-600";
-    case "SUBMITTED":
-      return "bg-blue-100 text-blue-700";
-    case "APPROVED":
-      return "bg-green-100 text-green-700";
-    case "FLAGGED":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-gray-100 text-gray-600";
-  }
-};
+
 
 export interface Report {
   _id: string;
@@ -39,7 +25,19 @@ export interface Expense {
   currency: string;
   expenseDate: string;
   status: string;
+  flagReason?: string;
+  originalAmount: number ;
+  tags: string[];
 }
+
+interface Column<T> {
+  header: string;
+  accessor: keyof T | string;
+  render?: (row: T) => React.ReactNode;
+  className?: string;
+}
+
+const REPORTS_PAGE_SIZE = 4;
 
 const ExpenseReport: React.FC = () => {
   const [reports, setReports] = useState<Report[]>([]);
@@ -47,8 +45,10 @@ const ExpenseReport: React.FC = () => {
    const [openModal, setOpenModal] = useState(false);
    const [error, setError] = useState<string | null>(null);
    const [reportPage, setReportPageState] = useState<Record<string, number>>({});
-const [reportTotalPages, setReportTotalPages] = useState<Record<string, number>>({});
-const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [reportTotalPages, setReportTotalPages] = useState<Record<string, number>>({});
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsTotalPages, setReportsTotalPages] = useState(1);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
 
 const token=localStorage.getItem("token") || ""
@@ -67,7 +67,7 @@ const setReportPage = (reportId: string, page: number) => {
     setError(null);
 
     const res = await fetch(
-      "http://localhost:8000/api/expenseReport/my-reports",
+      `http://localhost:8000/api/expenseReport/my-reports?page=${reportsPage}&limit=${REPORTS_PAGE_SIZE}`,
       { headers: { token } }
     );
 
@@ -80,6 +80,7 @@ const setReportPage = (reportId: string, page: number) => {
 
     const reportsData = data.reports || [];
     setReports(reportsData);
+    setReportsTotalPages(data.totalPages || 1);
 
     reportsData.forEach(async (report: Report) => {
       const page = reportPage[report._id] || 1;
@@ -109,7 +110,7 @@ const setReportPage = (reportId: string, page: number) => {
 
 useEffect(() => {
   fetchReports();
-}, [reportPage]);
+}, [reportPage, reportsPage]);
 
 
   //creating report
@@ -141,6 +142,7 @@ useEffect(() => {
     }
 
     setReports((prev) => [data.report, ...prev]);
+    setReportsPage(1);
     setOpenModal(false);
 
   } catch {
@@ -196,15 +198,7 @@ const deleteReport = async (reportId: string) => {
       return;
     }
 
-    // remove report from UI
-    setReports((prev) => prev.filter((r) => r._id !== reportId));
-
-    // remove expenses cache
-    setExpensesByReport((prev) => {
-      const copy = { ...prev };
-      delete copy[reportId];
-      return copy;
-    });
+    await fetchReports();
 
   } catch (err) {
     setError("Server error. Please try again.");
@@ -241,56 +235,125 @@ const handleUpdateExpense = async (
   }
 };
 
+const handleSubmitDraftExpense = async (expenseId: string) => {
+  try {
+    setError(null);
 
-//DELETE THE EXPENSE
-// const handleDeleteExpense = async (expenseId: string) => {
-//     const confirmDelete = window.confirm(
-//       "Are you sure you want to delete this expense?"
-//     );
+    const res = await fetch(
+      `http://localhost:8000/api/expenses/submit-draftExpense/${expenseId}`,
+      {
+        method: "PUT",
+        headers: { token },
+      }
+    );
 
-//     if (!confirmDelete) return;
+    const data = await res.json();
 
-//     try {
-//       const token = localStorage.getItem("token");
+    if (!res.ok) {
+      setError(data.message || "Failed to submit draft expense");
+      return;
+    }
 
-//       await axios.delete(
-//         `http://localhost:8000/api/expenses/delete-expense/${expenseId}`,
-//         {
-//           headers: { token },
-//         }
-//       );
+    await fetchReports();
 
-//       await fetchExpenses(); // refresh list
-//     } catch (err: any) {
-//       alert(err.response?.data?.message || "Failed to delete expense");
-//     }
-//   };
+  } catch {
+    setError("Server error while submitting draft expense");
+  }
+};
+
+const handleSubmitFlaggedExpense = async (expenseId: string) => {
+  try {
+    setError(null);
+
+    const res = await fetch(
+      `http://localhost:8000/api/expenses/submit-flagged-expense/${expenseId}`,
+      {
+        method: "PUT",
+        headers: { token },
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.message || "Failed to resubmit flagged expense");
+      return;
+    }
+
+    await fetchReports();
+
+  } catch {
+    setError("Server error while resubmitting flagged expense");
+  }
+};
 
 
 
 
-const columns = [
+
+
+const columns: Column<Expense>[] = [
   { header: "Title", accessor: "title" },
   {
     header: "Amount",
+    accessor: "amount",
     render: (exp: Expense) => `${exp.currency} ${exp.amount}`,
   },
   {
     header: "Date",
+    accessor: "expenseDate",
     render: (exp: Expense) =>
       new Date(exp.expenseDate).toLocaleDateString(),
   },
-  { header: "Status", accessor: "status" },
+  {
+    header: "Status",
+    accessor: "status",
+    render: (exp: Expense) =>
+      exp.status === "FLAGGED" ? (
+        <div className="space-y-1">
+          <div className="font-medium text-amber-700">{exp.status}</div>
+          <div className="max-w-[220px] text-xs leading-5 text-slate-500">
+            Reason: {exp.flagReason || "Requires correction"}
+          </div>
+        </div>
+      ) : (
+        exp.status
+      ),
+  },
   {
     header: "Actions",
-    render: (exp: Expense) => (
-      <button
-        onClick={() => setEditingExpense(exp)}
-        className="px-3 py-1 bg-blue-600 text-white rounded text-xs"
-      >
-        Edit
-      </button>
-    ),
+    accessor: "actions",
+    render: (exp: Expense) =>
+      exp.status === "DRAFT" || exp.status === "FLAGGED" ? (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setEditingExpense(exp)}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-xs"
+          >
+            Edit
+          </button>
+
+          {exp.status === "DRAFT" && (
+            <button
+              onClick={() => handleSubmitDraftExpense(exp._id)}
+              className="px-3 py-1 bg-green-600 text-white rounded text-xs"
+            >
+              Submit
+            </button>
+          )}
+
+          {exp.status === "FLAGGED" && (
+            <button
+              onClick={() => handleSubmitFlaggedExpense(exp._id)}
+              className="px-3 py-1 bg-green-600 text-white rounded text-xs"
+            >
+              Submit
+            </button>
+          )}
+        </div>
+      ) : (
+        <span className="text-xs text-slate-400">No actions</span>
+      ),
   },
 ];
 
@@ -398,6 +461,37 @@ const columns = [
           )
         }
       />
+
+      {reports.length > 0 && (
+        <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-row">
+          <div className="text-sm text-slate-500">
+            Showing page <span className="font-semibold text-slate-900">{reportsPage}</span> of{" "}
+            <span className="font-semibold text-slate-900">{Math.max(reportsTotalPages, 1)}</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              disabled={reportsPage === 1}
+              onClick={() => setReportsPage((prev) => prev - 1)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+
+            <div className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+              {reportsPage}
+            </div>
+
+            <button
+              disabled={reportsPage >= Math.max(reportsTotalPages, 1)}
+              onClick={() => setReportsPage((prev) => prev + 1)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
 

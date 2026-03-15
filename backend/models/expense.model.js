@@ -50,4 +50,5 @@ expenseSchema.index({ "raisedBy.dept": 1, status: 1 });
 expenseSchema.index({ expenseDate: 1 })
 expenseSchema.index({ reportId: 1 });
 
+
 export default mongoose.model("ExpenseModel", expenseSchema);
