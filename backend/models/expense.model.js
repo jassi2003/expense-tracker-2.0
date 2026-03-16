@@ -47,7 +47,7 @@ const expenseSchema = new mongoose.Schema({
 
 expenseSchema.index({ organizationId: 1, "raisedBy.userId": 1, status: 1 });
 expenseSchema.index({ organizationId: 1, expenseDate: 1 })
-expenseSchema.index({ organizationId: 1, reportId: 1, status: 1 });
+expenseSchema.index({  reportId: 1, status: 1 });
 
 
 export default mongoose.model("ExpenseModel", expenseSchema);

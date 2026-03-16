@@ -30,6 +30,23 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getTokenExpiryTime = (jwtToken: string): number | null => {
+  try {
+    const [, payload] = jwtToken.split(".");
+
+    if (!payload) return null;
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(window.atob(normalized));
+
+    if (typeof decoded.exp !== "number") return null;
+
+    return decoded.exp * 1000;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -48,12 +65,48 @@ const [token, setToken] = useState<string | null>(() => {
   const storedUser = localStorage.getItem("user");
 
   if (storedToken && storedUser) {
-    setToken(storedToken);
-    setUser(JSON.parse(storedUser));
+    const expiryTime = getTokenExpiryTime(storedToken);
+
+    if (expiryTime && expiryTime <= Date.now()) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    } else {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+    }
   }
 
   setAuthLoading(false);
 }, []);
+
+//HANDLE LOGOUT
+ const logout = useCallback(() => {
+  setUser(null);
+  setToken(null);
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+}, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const expiryTime = getTokenExpiryTime(token);
+
+    if (!expiryTime) return;
+
+    const timeRemaining = expiryTime - Date.now();
+
+    if (timeRemaining <= 0) {
+      logout();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      logout();
+    }, timeRemaining);
+
+    return () => window.clearTimeout(timer);
+  }, [token, logout]);
 
 
 
@@ -94,21 +147,12 @@ const login = useCallback(async (email: string, password: string) => {
 
   } catch (err: any) {
     const message =
-      err?.response?.data?.message ||  // backend error message
-      err?.message ||                 // axios fallback
+      err?.response?.data?.message ||  
+      err?.message ||                 
       "Login failed";
 
     throw new Error(message);
   }
-}, []);
-
-
-  //HANDLE LOGOUT
- const logout = useCallback(() => {
-  setUser(null);
-  setToken(null);
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
 }, []);
 
 

@@ -87,7 +87,7 @@ console.log(req.body)
     organizationId:findUser.organizationId
   };
 
-  const token = jwt.sign({ payload }, process.env.JWT_SECRET, { expiresIn: "1m" });
+  const token = jwt.sign({ payload }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
   return res.json({
     success: true,

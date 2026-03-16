@@ -156,8 +156,8 @@ export const addExpense = asyncHandler(async (req, res) => {
 
     await expenseReportModel.findOneAndUpdate(
   {
+    organizationId,
     _id: reportId,
-    organizationId
   },
   {
     $inc: { totalAmount: created.amount }
@@ -480,12 +480,8 @@ export const updateExpense = asyncHandler(async (req, res) => {
 
   await expense.save();
 
-  // Recalculate report status based on expenses
-  const reportExpenses = await expenseModel.find({
-    reportId: expense.reportId
-  });
 
-  const statuses = reportExpenses.map(e => e.status);
+
 // Recalculate report status using aggregation
 let reportStatus = "SUBMITTED";
 
@@ -498,7 +494,7 @@ const statusCounts = await expenseModel.aggregate([
     }
   }
 ]);
-
+//converting array into object
 const counts = {};
 statusCounts.forEach(s => {
   counts[s._id] = s.count;
