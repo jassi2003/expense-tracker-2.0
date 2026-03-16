@@ -74,4 +74,10 @@ const purchaseRequestSchema = new mongoose.Schema({
     }
 });
 
+
+purchaseRequestSchema.index({ organizationId: 1,"raisedBy.userId": 1,status:1});
+
+
+
+
 export default mongoose.model("purchaseRequests", purchaseRequestSchema);

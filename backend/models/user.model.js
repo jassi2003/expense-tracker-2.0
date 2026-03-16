@@ -26,6 +26,6 @@ const userSchema = new mongoose.Schema({
 
 
 userSchema.index({ organizationId: 1, userId: 1 },{ unique: true });
-userSchema.index({ isActive: 1 });
+userSchema.index({organization:1, isActive: 1 });
 
 export default mongoose.model("UserModel", userSchema);

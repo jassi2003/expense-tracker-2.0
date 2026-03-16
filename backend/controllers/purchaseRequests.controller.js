@@ -85,9 +85,9 @@ export const submitPurchaseRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const request = await purchaseRequestModel.findOne({
-    _id: id,
     organizationId,
-    "raisedBy.userId": req.user.userId
+    "raisedBy.userId": req.user.userId,
+    _id: id,
   });
 
   if (!request) {
@@ -120,7 +120,6 @@ export const submitPurchaseRequest = asyncHandler(async (req, res) => {
 });
 
 
-//ALL PURACHSE REQUESTS BY EMPLOYEE
 // ALL PURCHASE REQUESTS BY EMPLOYEE
 export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
 
@@ -141,8 +140,8 @@ export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
   const status = req.query.status;
 
   const query = {
+    organizationId,
     "raisedBy.userId": employeeId,
-    organizationId
   };
 
   // status filter 
@@ -168,6 +167,8 @@ export const getMyPurchaseRequests = asyncHandler(async (req, res) => {
   });
 
 });
+
+
 
 // ALL EMPLOYEES PURCHASE REQUESTS FOR ADMIN
 export const getAllPurchaseRequests = asyncHandler(async (req, res) => {
@@ -232,8 +233,8 @@ export const approvePurchaseRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const request = await purchaseRequestModel.findOne({
+    organizationId,
     _id: id,
-    organizationId
   });
 
   if (!request) {
@@ -275,8 +276,8 @@ export const rejectPurchaseRequest = asyncHandler(async (req, res) => {
   }
 
   const request = await purchaseRequestModel.findOne({
+    organizationId,
     _id: id,
-    organizationId
   });
 
   if (!request) {
@@ -314,9 +315,9 @@ export const editPurchaseRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const request = await purchaseRequestModel.findOne({
-    _id: id,
     organizationId,
-    "raisedBy.userId": req.user.userId
+    "raisedBy.userId": req.user.userId,
+    _id: id,
   });
 
   if (!request) {
@@ -386,9 +387,9 @@ export const deletePurchaseRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const request = await purchaseRequestModel.findOne({
-    _id: id,
     organizationId,
-    "raisedBy.userId": req.user.userId
+    "raisedBy.userId": req.user.userId,
+    _id: id,
   });
 
   if (!request) {

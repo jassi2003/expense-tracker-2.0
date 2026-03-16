@@ -34,9 +34,9 @@ export const addExpense = asyncHandler(async (req, res) => {
     }
 
     report = await expenseReportModel.findOne({
-      _id: new mongoose.Types.ObjectId(reportId),
-      employeeId: req.user.userId,
-      organizationId
+      organizationId,
+  "raisedBy.userId": req.user.userId,
+      _id: new mongoose.Types.ObjectId(reportId)
     });
 
     if (!report) {
@@ -68,8 +68,8 @@ export const addExpense = asyncHandler(async (req, res) => {
 
   //validating deparment
   const department = await departmentModel.findOne({
+    organizationId,
     departmentName: { $regex: `^${req.user.dept}$`, $options: "i" },
-    organizationId
   });
 
 
@@ -174,6 +174,7 @@ export const addExpense = asyncHandler(async (req, res) => {
 });
 
 
+
 //SUBMIT THE DRAFT EXPENSE
 export const submitDraftExpense = asyncHandler(async (req, res) => {
 
@@ -185,9 +186,9 @@ export const submitDraftExpense = asyncHandler(async (req, res) => {
   }
 
   const expense = await expenseModel.findOne({
-    _id: expenseId,
+    organizationId,
     "raisedBy.userId": req.user?.userId,
-    organizationId
+    _id: expenseId,
   });
 
   if (!expense) {
@@ -294,8 +295,8 @@ export const getMyExpenses = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const filter = {
+    organizationId,
     "raisedBy.userId": userId,
-    organizationId
   };
 
   // Apply status filter
@@ -360,8 +361,8 @@ export const updateExpense = asyncHandler(async (req, res) => {
   }
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: expenseId,
-    organizationId
   });
 
 
@@ -485,29 +486,47 @@ export const updateExpense = asyncHandler(async (req, res) => {
   });
 
   const statuses = reportExpenses.map(e => e.status);
+// Recalculate report status using aggregation
+let reportStatus = "SUBMITTED";
 
-  let reportStatus = "SUBMITTED";
-
-  if (statuses.includes("FLAGGED")) {
-    reportStatus = "FLAGGED";
+const statusCounts = await expenseModel.aggregate([
+  { $match: { reportId: expense.reportId } },
+  {
+    $group: {
+      _id: "$status",
+      count: { $sum: 1 }
+    }
   }
-  else if (statuses.every(s => s === "APPROVED")) {
-    reportStatus = "APPROVED";
-  }
-  else if (statuses.every(s => s === "REJECTED")) {
-    reportStatus = "REJECTED";
-  }
+]);
 
-  await expenseReportModel.findByIdAndUpdate(
-    expense.reportId,
-    { status: reportStatus }
-  );
+const counts = {};
+statusCounts.forEach(s => {
+  counts[s._id] = s.count;
+});
 
-  return res.status(200).json({
-    success: true,
-    message: "Expense updated successfully",
-    expense,
-  });
+const totalExpenses = Object.values(counts).reduce((a, b) => a + b, 0);
+
+if (counts.FLAGGED > 0) {
+  reportStatus = "FLAGGED";
+}
+else if (counts.APPROVED === totalExpenses) {
+  reportStatus = "APPROVED";
+}
+else if (counts.REJECTED === totalExpenses) {
+  reportStatus = "REJECTED";
+}
+
+await expenseReportModel.findByIdAndUpdate(
+  expense.reportId,
+  { status: reportStatus }
+);
+
+return res.status(200).json({
+  success: true,
+  message: "Expense updated successfully",
+  expense,
+});
+
 });
 
 
@@ -605,8 +624,8 @@ export const approveExpense = asyncHandler(async (req, res) => {
   }
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: expId,
-    organizationId
   });
 
   if (!expense) {
@@ -634,8 +653,8 @@ export const approveExpense = asyncHandler(async (req, res) => {
 
   const updatedDept = await departmentModel.findOneAndUpdate(
     {
-      departmentName: deptKey,
       organizationId,
+      departmentName: deptKey,
       $expr: {
         $gte: ["$totalBudget", { $add: ["$consumedBudget", amount] }]
       }
@@ -707,8 +726,8 @@ export const rejectExpense = asyncHandler(async (req, res) => {
 
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: expId,
-    organizationId
   });
 
   if (!expense) {
@@ -755,8 +774,8 @@ export const flagExpense = asyncHandler(async (req, res) => {
 
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: expId,
-    organizationId
   });
 
   if (!expense) {
@@ -806,9 +825,9 @@ export const submitFlaggedExpense = asyncHandler(async (req, res) => {
     // Update flagged expense → pending
     const expense = await expenseModel.findOneAndUpdate(
       {
-        _id: expenseId,
-        "raisedBy.userId": employeeId,
         organizationId,
+        "raisedBy.userId": employeeId,
+        _id: expenseId,
         status: "FLAGGED"
       },
       {
@@ -830,9 +849,9 @@ export const submitFlaggedExpense = asyncHandler(async (req, res) => {
     if (expense.reportId) {
       report = await expenseReportModel.findOneAndUpdate(
         {
+          organizationId,
+          "raisedBy.userId": req.user.userId,
           _id: expense.reportId,
-          employeeId,
-          organizationId
         },
         {
           $set: { status: "SUBMITTED" }
@@ -862,7 +881,7 @@ export const submitFlaggedExpense = asyncHandler(async (req, res) => {
 
 
 
-// REPORT GENERATION FOR DASHBOARD
+// REPORT GENERATION FOR ADMIN DASHBOARD
 // //overall monthly stats
 export const getOverallAnalytics = asyncHandler(async (req, res) => {
   const { fromDate, toDate } = req.query;
@@ -1119,8 +1138,8 @@ export const getMonthlyExpenseSummary = asyncHandler(async (req, res) => {
     {
       $match: {
         organizationId: new mongoose.Types.ObjectId(organizationId),
+        expenseDate: { $gte: start, $lt: end },
         status: statusFilter,
-        expenseDate: { $gte: start, $lt: end }
       }
     },
     {
@@ -1230,8 +1249,8 @@ export const getExpenseById = asyncHandler(async (req, res) => {
   }
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: id,
-    organizationId
   });
 
   if (!expense) {
@@ -1261,8 +1280,8 @@ export const deleteExpense = asyncHandler(async (req, res) => {
   }
 
   const expense = await expenseModel.findOne({
+    organizationId,
     _id: id,
-    organizationId
   });
 
   if (!expense) {

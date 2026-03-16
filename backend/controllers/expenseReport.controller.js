@@ -16,7 +16,6 @@ export const createReport = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Organization not found in token");
     }
     const report = await expenseReportModel.create({
-      employeeId: req.user.userId,
       reportName,
       purpose,
       date,
@@ -52,8 +51,8 @@ export const getMyReports = asyncHandler(async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filter = {
-      employeeId: req.user.userId,
-      organizationId
+      organizationId,
+      "raisedBy.userId": req.user.userId
     };
 
     const [reports, totalReports] = await Promise.all([
@@ -96,9 +95,9 @@ export const getExpensesByReport = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const report = await expenseReportModel.findOne({
+    organizationId,
+  "raisedBy.userId": req.user.userId,
     _id: reportId,
-    employeeId,
-    organizationId
   });
 
   if (!report) {
@@ -141,7 +140,8 @@ export const deleteDraftReport = asyncHandler(async (req, res) => {
   try {
 
     const report = await expenseReportModel.findOneAndDelete(
-      { _id: reportId, status: "DRAFT" },
+      { _id: reportId,
+         status: "DRAFT" },
       { session }
     );
 
@@ -180,13 +180,12 @@ export const submitReport = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid report id");
   }
 
-  const employeeId = req.user.userId;
   const organizationId = req.user?.organizationId;
 
   const report = await expenseReportModel.findOne({
-    _id: reportId,
-    employeeId,
-    organizationId
+    organizationId,
+    "raisedBy.userId": req.user.userId,
+    _id: reportId
   });
 
   if (!report) {
@@ -246,8 +245,8 @@ export const reviewExpense = asyncHandler(async (req, res) => {
 
   try {
     const expense = await expenseModel.findOne({
-      _id: expenseId,
-      organizationId
+      organizationId,
+      _id: expenseId
     }).session(session);
 
     if (!expense) {
@@ -310,32 +309,44 @@ export const reviewExpense = asyncHandler(async (req, res) => {
 
     await expense.save({ session });
 
-    //UPDATE REPORT STATUS
-    let reportStatus = "SUBMITTED";
+    // UPDATE REPORT STATUS
+let reportStatus = "SUBMITTED";
 
-    if (expense.reportId) {
+if (expense.reportId) {
 
-      const reportExpenses = await expenseModel.find(
-        { reportId: expense.reportId },
-        { status: 1 }
-      ).session(session);
-
-      const statuses = reportExpenses.map(e => e.status);
-
-      if (statuses.every(s => s === "APPROVED")) {
-        reportStatus = "APPROVED";
-      } else if (statuses.every(s => s === "REJECTED")) {
-        reportStatus = "REJECTED";
-      } else if (statuses.includes("FLAGGED")) {
-        reportStatus = "FLAGGED";
+  const statusCounts = await expenseModel.aggregate([
+    { $match: { reportId: expense.reportId } },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 }
       }
-
-      await expenseReportModel.findByIdAndUpdate(
-        expense.reportId,
-        { status: reportStatus },
-        { session }
-      );
     }
+  ]).session(session);
+
+  const counts = {};
+  statusCounts.forEach(s => {
+    counts[s._id] = s.count;
+  });
+
+  const totalExpenses = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  if (counts.APPROVED === totalExpenses) {
+    reportStatus = "APPROVED";
+  } 
+  else if (counts.REJECTED === totalExpenses) {
+    reportStatus = "REJECTED";
+  } 
+  else if (counts.FLAGGED > 0) {
+    reportStatus = "FLAGGED";
+  }
+
+  await expenseReportModel.findByIdAndUpdate(
+    expense.reportId,
+    { status: reportStatus },
+    { session }
+  );
+}
 
     await session.commitTransaction();
     session.endSession();
@@ -354,6 +365,7 @@ export const reviewExpense = asyncHandler(async (req, res) => {
     throw error;
   }
 });
+
 
 
 
@@ -434,8 +446,8 @@ if (status && status !== "ALL") {
   const [expenses, totalExpenses] = await Promise.all([
   expenseModel
     .find({
-      ...filter,
-      organizationId
+      organizationId,
+      ...filter
     })
     .sort({ expenseDate: -1 })
     .skip(skip)
