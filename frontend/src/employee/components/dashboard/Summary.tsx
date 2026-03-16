@@ -1,6 +1,27 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { CreditCard, CheckCircle2, Clock, TrendingUp } from "lucide-react";
-import type { SummaryData } from "@/employee/pages/Dashboard";
+
+type SummaryData = {
+  total: number;
+  approved: number;
+  pending: number;
+  monthlyAverage: number;
+  selectedMonth?: string;
+  selectedMonthLabel?: string;
+};
+
+type MonthOption = {
+  value: string;
+  label: string;
+  month: number;
+  year: number;
+};
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
 
 function formatINR(num: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -9,20 +30,77 @@ function formatINR(num: number) {
   }).format(num);
 }
 
-export default function Summary({
-  summary,
-  loading,
-}: {
-  summary: SummaryData | null;
-  loading: boolean;
-}) {
+export default function Summary() {
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [monthOptions, setMonthOptions] = useState<MonthOption[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setSummary(null);
+        return;
+      }
+
+      const [year, month] = selectedMonth.split("-").map(Number);
+
+      const res = await axios.get("http://localhost:8000/api/expenses/expense-summary", {
+        headers: { token },
+        params: { month, year },
+      });
+
+      setSummary(res.data?.summary || null);
+      setMonthOptions(res.data?.availableMonths || []);
+    } catch {
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
   const s = summary ?? { total: 0, approved: 0, pending: 0, monthlyAverage: 0 };
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
         <div className="text-xs font-semibold tracking-wide text-slate-600">
-          OVERALL SUMMARY
+          MONTH SUMMARY
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-slate-500">
+            {summary?.selectedMonthLabel || "Current Month"}
+          </div>
+          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
+            <label htmlFor="summary-month-filter" className="sr-only">
+              Select month
+            </label>
+            <select
+              id="summary-month-filter"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 focus:outline-none"
+            >
+              {monthOptions.length > 0 ? (
+                monthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))
+              ) : (
+                <option value={selectedMonth}>
+                  {summary?.selectedMonthLabel || "Current Month"}
+                </option>
+              )}
+            </select>
+          </div>
         </div>
       </div>
 

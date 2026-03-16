@@ -537,31 +537,98 @@ export const getExpenseSummary = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized");
   }
 
-  const summary = await expenseModel.aggregate([
-    {
-      $match: {
-        organizationId: new mongoose.Types.ObjectId(organizationId),
-        "raisedBy.userId": userId,
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ];
+
+  const now = new Date();
+  const requestedMonth = Number(req.query.month);
+  const requestedYear = Number(req.query.year);
+
+  const selectedMonth =
+    Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12
+      ? requestedMonth
+      : now.getMonth() + 1;
+
+  const selectedYear =
+    Number.isInteger(requestedYear) && requestedYear >= 2000
+      ? requestedYear
+      : now.getFullYear();
+
+  const baseMatch = {
+    organizationId: new mongoose.Types.ObjectId(organizationId),
+    "raisedBy.userId": userId,
+  };
+
+  const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+  const startOfNextMonth = new Date(selectedYear, selectedMonth, 1);
+
+  const [summary, availableMonthsRaw] = await Promise.all([
+    expenseModel.aggregate([
+      {
+        $match: {
+          ...baseMatch,
+          expenseDate: { $gte: startOfMonth, $lt: startOfNextMonth },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: "$amount" },
-        approved: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "APPROVED"] }, "$amount", 0],
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" },
+          approved: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "APPROVED"] }, "$amount", 0],
+            },
+          },
+          pending: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "PENDING"] }, "$amount", 0],
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    expenseModel.aggregate([
+      {
+        $match: baseMatch,
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$expenseDate" },
+            month: { $month: "$expenseDate" },
           },
         },
-        pending: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "PENDING"] }, "$amount", 0],
-          },
-        },
-        firstExpenseDate: { $min: "$expenseDate" },
       },
-    },
+      {
+        $sort: {
+          "_id.year": -1,
+          "_id.month": -1,
+        },
+      },
+    ])
   ]);
+
+  const selectedValue = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+  const selectedMonthOption = {
+    value: selectedValue,
+    label: `${monthNames[selectedMonth - 1]} ${selectedYear}`,
+    month: selectedMonth,
+    year: selectedYear,
+  };
+
+  const availableMonths = availableMonthsRaw.map(({ _id }) => ({
+    value: `${_id.year}-${String(_id.month).padStart(2, "0")}`,
+    label: `${monthNames[_id.month - 1]} ${_id.year}`,
+    month: _id.month,
+    year: _id.year,
+  }));
+
+  if (!availableMonths.some((item) => item.value === selectedValue)) {
+    availableMonths.unshift(selectedMonthOption);
+  }
 
   if (!summary.length) {
     return res.json({
@@ -571,21 +638,16 @@ export const getExpenseSummary = asyncHandler(async (req, res) => {
         approved: 0,
         pending: 0,
         monthlyAverage: 0,
+        selectedMonth: selectedValue,
+        selectedMonthLabel: selectedMonthOption.label,
       },
+      availableMonths,
     });
   }
 
   const result = summary[0];
 
-  const now = new Date();
-  const firstDate = new Date(result.firstExpenseDate);
-
-  const monthsDiff =
-    (now.getFullYear() - firstDate.getFullYear()) * 12 +
-    (now.getMonth() - firstDate.getMonth()) +
-    1;
-
-  const monthlyAverage = result.total / monthsDiff;
+  const monthlyAverage = result.count > 0 ? result.total / result.count : 0;
 
   return res.json({
     success: true,
@@ -594,7 +656,10 @@ export const getExpenseSummary = asyncHandler(async (req, res) => {
       approved: result.approved,
       pending: result.pending,
       monthlyAverage,
+      selectedMonth: selectedValue,
+      selectedMonthLabel: selectedMonthOption.label,
     },
+    availableMonths,
   });
 });
 

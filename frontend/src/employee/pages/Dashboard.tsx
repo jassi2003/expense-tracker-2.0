@@ -30,11 +30,12 @@ export type SummaryData = {
   approved: number;
   pending: number;
   monthlyAverage: number;
+  selectedMonth?: string;
+  selectedMonthLabel?: string;
 };
 
 export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [summary, setSummary] = useState<SummaryData | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [tagData, setTagData] = useState([]);
@@ -55,11 +56,8 @@ export default function Dashboard() {
       }
 
       //  Calling both APIs in parallel
-      const [expensesRes, summaryRes, tagAnalyticsRes] = await Promise.all([
+      const [expensesRes, tagAnalyticsRes] = await Promise.all([
         axios.get("http://localhost:8000/api/expenses/all-expenses", {
-          headers: { token },
-        }),
-        axios.get("http://localhost:8000/api/expenses/expense-summary", {
           headers: { token },
         }),
         axios.get(
@@ -68,12 +66,10 @@ export default function Dashboard() {
         )
       ]);
       setExpenses(expensesRes.data?.expenses || []);
-      setSummary(summaryRes.data?.summary || null);
       setTagData(tagAnalyticsRes.data.analytics);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load dashboard");
       setExpenses([]);
-      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -111,7 +107,7 @@ export default function Dashboard() {
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Summary summary={summary} loading={loading} />
+      <Summary />
       <TagAnalytics data={tagData} />
     </div>
 
